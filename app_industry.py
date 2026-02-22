@@ -468,6 +468,39 @@ with tab1:
         )
         st.plotly_chart(fig_cat_ts, use_container_width=True)
 
+    # ── Category AUM & Share ──────────────────────────────────
+    st.markdown(
+        f"<div class='section-header'>Category-wise AUM & Market Share \u2014 "
+        f"{latest_month_lbl}</div>",
+        unsafe_allow_html=True,
+    )
+
+    cat_aum = (
+        df_latest.groupby("sub_category")
+        .agg(aum=("aum_cur_cr", "sum"), flow=("net_flow_cr", "sum"))
+        .reset_index().sort_values("aum", ascending=True)
+    )
+    cat_aum["share"] = (cat_aum["aum"] / cat_aum["aum"].sum() * 100).round(1)
+    cat_aum["label"] = cat_aum.apply(
+        lambda r: f"{fmt_cr(r['aum'])} ({r['share']:.1f}%)", axis=1
+    )
+
+    fig_cat_aum = go.Figure(go.Bar(
+        x=cat_aum["aum"], y=cat_aum["sub_category"],
+        orientation="h", marker_color=COLOR_AUM, opacity=0.85,
+        text=cat_aum["label"],
+        textposition="outside", textfont=dict(size=10), cliponaxis=False,
+        hovertemplate="<b>%{y}</b><br>AUM: \u20b9%{x:,.0f} Cr<br>Share: %{customdata:.1f}%<extra></extra>",
+        customdata=cat_aum["share"],
+    ))
+    fig_cat_aum.update_layout(
+        height=max(450, len(cat_aum) * 32),
+        **CHART_THEME, showlegend=False, margin=dict(r=160, l=10),
+        xaxis=dict(title="AUM (\u20b9 Cr)", **AXIS_STYLE),
+        yaxis=dict(tickfont=dict(size=10), **AXIS_STYLE),
+    )
+    st.plotly_chart(fig_cat_aum, use_container_width=True)
+
     # ── Category Heatmap ──────────────────────────────────────
     st.markdown(
         "<div class='section-header'>Flow Heatmap \u2014 Category \u00d7 Period</div>",
@@ -572,6 +605,38 @@ with tab2:
             yaxis=dict(tickfont=dict(size=11), **AXIS_STYLE),
         )
         st.plotly_chart(fig_amc_flow, use_container_width=True)
+
+        # ── AMC Net Inflow Market Share % ─────────────────────────
+        st.markdown(
+            f"<div class='section-header'>AMC Net Inflow Market Share (%) \u2014 "
+            f"{latest_period_lbl}</div>",
+            unsafe_allow_html=True,
+        )
+
+        amc_flow_share = amc_latest[amc_latest["net_flow_cr"] > 0].sort_values("flow_share")
+        amc_flow_share = amc_flow_share.tail(20)  # top 20 by share
+
+        fig_flow_share = go.Figure(go.Bar(
+            x=amc_flow_share["flow_share"], y=amc_flow_share["amc"],
+            orientation="h", marker_color=COLOR_POS, opacity=0.85,
+            text=[f"{v:.1f}% ({fmt_cr(f)})" for v, f in
+                  zip(amc_flow_share["flow_share"], amc_flow_share["net_flow_cr"])],
+            textposition="outside", textfont=dict(size=10), cliponaxis=False,
+            hovertemplate=(
+                "<b>%{y}</b><br>"
+                "Inflow Share: %{x:.1f}%<br>"
+                "Net Flow: \u20b9%{customdata:,.0f} Cr<extra></extra>"
+            ),
+            customdata=amc_flow_share["net_flow_cr"],
+        ))
+        fig_flow_share.update_layout(
+            height=max(500, len(amc_flow_share) * 28),
+            **CHART_THEME, showlegend=False,
+            margin=dict(r=180, l=10),
+            xaxis=dict(title="Net Inflow Share (%)", ticksuffix="%", **AXIS_STYLE),
+            yaxis=dict(tickfont=dict(size=11), **AXIS_STYLE),
+        )
+        st.plotly_chart(fig_flow_share, use_container_width=True)
 
         # ── AMC AUM Ranking ──────────────────────────────────────
         st.markdown(
