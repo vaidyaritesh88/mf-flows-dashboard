@@ -140,6 +140,7 @@ def agg_by_period(df, period, extra_group=None):
     agg["flow_pct"] = np.where(
         agg["aum_cr"] > 0, agg["net_flow_cr"] / agg["aum_cr"] * 100, 0
     )
+    agg["flow_pct"] = agg["flow_pct"].round(1)
     return agg.sort_values("period_sort")
 
 
@@ -371,7 +372,7 @@ with tab1:
             x=monthly["period_label"], y=monthly["flow_pct"],
             name="Flow / AUM %", line=dict(color="#7c3aed", width=2.5),
             mode="lines+markers", marker=dict(size=6),
-            hovertemplate="Flow/AUM: %{y:+.2f}%<extra></extra>",
+            hovertemplate="Flow/AUM: %{y:+.1f}%<extra></extra>",
         ), secondary_y=True)
 
         fig_flow.update_layout(
