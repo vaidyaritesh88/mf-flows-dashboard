@@ -729,13 +729,12 @@ with tab4:
     )
 
     show_df = (
-        df[[
-            "month_lbl", "scheme_name", "category", "sub_category",
-            "aum_cur_cr", "aum_prev_cr", "expected_aum_cr",
-            "nav_cur", "nav_prev", "nav_return",
-            "net_flow_cr", "flow_pct",
-        ]].copy()
-        .sort_values(["month_end", "net_flow_cr"], ascending=[False, False])
+        df.sort_values(["month_end", "net_flow_cr"], ascending=[False, False])
+        [["month_lbl", "scheme_name", "category", "sub_category",
+          "aum_cur_cr", "aum_prev_cr", "expected_aum_cr",
+          "nav_cur", "nav_prev", "nav_return",
+          "net_flow_cr", "flow_pct"]]
+        .copy()
     )
 
     show_df.columns = [
