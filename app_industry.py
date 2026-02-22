@@ -193,49 +193,52 @@ with st.sidebar:
     st.markdown("## \U0001f30f Industry MF Flows")
     st.markdown("---")
 
-    st.markdown("### \U0001f4e5 Fetch Data")
-    st.caption("Fetches ALL AMCs at once (system-level) via mfid=0.")
-    col_y, col_m = st.columns(2)
-    with col_y:
-        sel_year = st.selectbox("Year", list(range(2024, date.today().year + 1))[::-1])
-    with col_m:
-        sel_month = st.selectbox("Month", list(range(1, 13)),
-                                  format_func=lambda m: pl.MONTH_ABBR[m])
+    # Show fetch controls only when running locally (not on Streamlit Cloud)
+    _is_cloud = os.environ.get("STREAMLIT_SHARING") or os.environ.get("STREAMLIT_SERVER_HEADLESS")
+    if not _is_cloud:
+        st.markdown("### \U0001f4e5 Fetch Data")
+        st.caption("Fetches ALL AMCs at once (system-level) via mfid=0.")
+        col_y, col_m = st.columns(2)
+        with col_y:
+            sel_year = st.selectbox("Year", list(range(2024, date.today().year + 1))[::-1])
+        with col_m:
+            sel_month = st.selectbox("Month", list(range(1, 13)),
+                                      format_func=lambda m: pl.MONTH_ABBR[m])
 
-    if st.button("\u2b07\ufe0f Fetch & Compute", use_container_width=True):
-        with st.spinner(f"Fetching all AMCs for {pl.MONTH_ABBR[sel_month]} {sel_year}..."):
-            try:
-                pl.compute_flows_for_month(sel_year, sel_month)
-                st.cache_data.clear()
-                st.success("Done!")
-            except Exception as e:
-                st.error(f"Error: {e}")
+        if st.button("\u2b07\ufe0f Fetch & Compute", use_container_width=True):
+            with st.spinner(f"Fetching all AMCs for {pl.MONTH_ABBR[sel_month]} {sel_year}..."):
+                try:
+                    pl.compute_flows_for_month(sel_year, sel_month)
+                    st.cache_data.clear()
+                    st.success("Done!")
+                except Exception as e:
+                    st.error(f"Error: {e}")
 
-    with st.expander("\U0001f4c5 Load Multiple Months"):
-        hist_months = st.number_input("Months back", min_value=1, max_value=24, value=6)
-        preview = []
-        for i in range(hist_months, -1, -1):
-            dt = date(sel_year, sel_month, 1) - relativedelta(months=i)
-            preview.append(f"{pl.MONTH_ABBR[dt.month]} {dt.year}")
-        st.info(f"**{preview[0]}** to **{preview[-1]}** ({len(preview)} months)")
-
-        if st.button("\U0001f504 Load All", use_container_width=True):
-            import time as _time
-            progress = st.progress(0)
-            months_list = []
+        with st.expander("\U0001f4c5 Load Multiple Months"):
+            hist_months = st.number_input("Months back", min_value=1, max_value=24, value=6)
+            preview = []
             for i in range(hist_months, -1, -1):
                 dt = date(sel_year, sel_month, 1) - relativedelta(months=i)
-                months_list.append((dt.year, dt.month))
-            for idx, (yr, mn) in enumerate(months_list):
-                st.text(f"Processing {pl.MONTH_ABBR[mn]} {yr}...")
-                try:
-                    pl.compute_flows_for_month(yr, mn)
-                except Exception as e:
-                    st.warning(f"Error: {pl.MONTH_ABBR[mn]} {yr}: {e}")
-                progress.progress((idx + 1) / len(months_list))
-                _time.sleep(0.5)
-            st.cache_data.clear()
-            st.success(f"Loaded {len(months_list)} months!")
+                preview.append(f"{pl.MONTH_ABBR[dt.month]} {dt.year}")
+            st.info(f"**{preview[0]}** to **{preview[-1]}** ({len(preview)} months)")
+
+            if st.button("\U0001f504 Load All", use_container_width=True):
+                import time as _time
+                progress = st.progress(0)
+                months_list = []
+                for i in range(hist_months, -1, -1):
+                    dt = date(sel_year, sel_month, 1) - relativedelta(months=i)
+                    months_list.append((dt.year, dt.month))
+                for idx, (yr, mn) in enumerate(months_list):
+                    st.text(f"Processing {pl.MONTH_ABBR[mn]} {yr}...")
+                    try:
+                        pl.compute_flows_for_month(yr, mn)
+                    except Exception as e:
+                        st.warning(f"Error: {pl.MONTH_ABBR[mn]} {yr}: {e}")
+                    progress.progress((idx + 1) / len(months_list))
+                    _time.sleep(0.5)
+                st.cache_data.clear()
+                st.success(f"Loaded {len(months_list)} months!")
 
     st.markdown("---")
     st.markdown("### \U0001f50d Filters")

@@ -1,5 +1,5 @@
-# Data files (regenerated via pipeline)
-data/*.db
+# Data files — tracked in git so Streamlit Cloud has pre-loaded data
+# data/*.db
 
 # Python
 __pycache__/
