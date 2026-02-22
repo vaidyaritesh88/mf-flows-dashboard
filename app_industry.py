@@ -723,33 +723,44 @@ with tab2:
         )
         st.plotly_chart(fig_scatter, use_container_width=True)
 
-        # ── AMC Flow Time-Series (top 10) ─────────────────────────
+        # ── AMC Net Inflow Share % Trends (top 10) ─────────────────
         st.markdown(
-            "<div class='section-header'>AMC Net Flow Trends (Top 10)</div>",
+            "<div class='section-header'>AMC Net Inflow Share % Trends (Top 10)</div>",
             unsafe_allow_html=True,
         )
 
         if len(amc_agg["period_label"].unique()) > 1:
+            # Compute flow share % by period
+            period_flow_totals = amc_agg.groupby("period_label").agg(
+                total_flow=("net_flow_cr", "sum"),
+            ).reset_index()
+            amc_share_flow = amc_agg.merge(period_flow_totals, on="period_label")
+            amc_share_flow["flow_share_pct"] = np.where(
+                amc_share_flow["total_flow"] != 0,
+                (amc_share_flow["net_flow_cr"] / amc_share_flow["total_flow"] * 100).round(1),
+                0,
+            )
+
             top_amcs = (
-                amc_agg.groupby("amc")["net_flow_cr"]
+                amc_share_flow.groupby("amc")["net_flow_cr"]
                 .apply(lambda x: x.abs().sum())
                 .nlargest(10).index.tolist()
             )
-            amc_ts = amc_agg[amc_agg["amc"].isin(top_amcs)].sort_values("period_sort")
+            amc_ts = amc_share_flow[amc_share_flow["amc"].isin(top_amcs)].sort_values("period_sort")
 
             fig_amc_trend = px.line(
-                amc_ts, x="period_label", y="net_flow_cr", color="amc",
+                amc_ts, x="period_label", y="flow_share_pct", color="amc",
                 markers=True, height=460,
-                labels={"net_flow_cr": "Net Flow (\u20b9 Cr)",
+                labels={"flow_share_pct": "Net Inflow Share (%)",
                         "period_label": "", "amc": "AMC"},
             )
             fig_amc_trend.update_traces(
-                hovertemplate="<b>%{fullData.name}</b><br>Flow: \u20b9%{y:,.0f} Cr<extra></extra>"
+                hovertemplate="<b>%{fullData.name}</b><br>Inflow Share: %{y:.1f}%<extra></extra>"
             )
-            fig_amc_trend.add_hline(y=0, line_dash="dash", line_color="#9ca3af", line_width=1)
             fig_amc_trend.update_layout(
                 **CHART_THEME, hovermode="x",
-                xaxis=dict(**AXIS_STYLE), yaxis=dict(**AXIS_STYLE),
+                xaxis=dict(**AXIS_STYLE),
+                yaxis=dict(title="Net Inflow Share (%)", ticksuffix="%", **AXIS_STYLE),
                 legend=dict(font=dict(size=11)),
             )
             st.plotly_chart(fig_amc_trend, use_container_width=True)
