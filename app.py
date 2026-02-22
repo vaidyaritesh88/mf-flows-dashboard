@@ -98,7 +98,10 @@ def add_period_cols(df):
 
 
 def agg_by_period(df, period, extra_group=None):
-    """Aggregate monthly data to selected period granularity."""
+    """
+    Aggregate monthly data to selected period granularity.
+    Two-step: (1) sum schemes → monthly totals, (2) aggregate months → period.
+    """
     if extra_group is None:
         extra_group = []
     df = df.sort_values("month_end").copy()
@@ -117,10 +120,20 @@ def agg_by_period(df, period, extra_group=None):
     if df.empty:
         return pd.DataFrame()
 
-    grp = extra_group + ["_period"]
-    agg = df.groupby(grp, sort=False).agg(
+    # Step 1: Sum scheme-level data to monthly totals (per extra_group)
+    monthly_grp = extra_group + ["_period", "month_end"]
+    monthly = df.groupby(monthly_grp, sort=False).agg(
         net_flow_cr=("net_flow_cr", "sum"),
-        aum_cr=("aum_cur_cr", "last"),
+        aum_cr=("aum_cur_cr", "sum"),
+    ).reset_index().sort_values("month_end")
+
+    # Step 2: Aggregate monthly totals to period level
+    #   Flows: SUM across months in the period
+    #   AUM: last month's total (end-of-period AUM)
+    grp = extra_group + ["_period"]
+    agg = monthly.groupby(grp, sort=False).agg(
+        net_flow_cr=("net_flow_cr", "sum"),
+        aum_cr=("aum_cr", "last"),
         period_sort=("month_end", "max"),
     ).reset_index()
     agg.rename(columns={"_period": "period_label"}, inplace=True)
