@@ -1032,10 +1032,12 @@ with tab4:
         unsafe_allow_html=True,
     )
 
-    show_df = df_all[[
-        "month_lbl", "amc", "scheme_name", "category", "sub_category",
-        "aum_cur_cr", "aum_prev_cr", "net_flow_cr", "flow_pct",
-    ]].copy().sort_values(["month_end", "net_flow_cr"], ascending=[False, False])
+    show_df = (
+        df_all.sort_values(["month_end", "net_flow_cr"], ascending=[False, False])
+        [["month_lbl", "amc", "scheme_name", "category", "sub_category",
+          "aum_cur_cr", "aum_prev_cr", "net_flow_cr", "flow_pct"]]
+        .copy()
+    )
 
     show_df.columns = [
         "Month", "AMC", "Scheme", "Category", "Sub-Category",
