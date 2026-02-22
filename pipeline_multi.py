@@ -160,7 +160,7 @@ def init_db():
             expected_aum_cr REAL,
             net_flow_cr     REAL,
             flow_pct        REAL,
-            PRIMARY KEY (scheme_name, month_end)
+            PRIMARY KEY (amc, scheme_name, month_end)
         );
 
         CREATE TABLE IF NOT EXISTS pipeline_log (
@@ -339,6 +339,7 @@ def compute_flows_for_month(year: int, month: int):
         "net_flow_cr", "flow_pct"]].copy()
 
     flow_df = flow_df.dropna(subset=["net_flow_cr"])
+    flow_df = flow_df.drop_duplicates(subset=["amc", "scheme_name"], keep="first")
     flow_df["month_end"] = cur_date_iso
 
     # Store
