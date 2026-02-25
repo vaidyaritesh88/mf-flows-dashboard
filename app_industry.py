@@ -316,8 +316,11 @@ latest_month = selected_month
 latest_month_lbl = pd.Timestamp(latest_month).strftime("%B %Y")
 latest_month_date_str = pd.Timestamp(latest_month).strftime("%d-%b-%Y")
 
-# FY YTD cumulative
-cfy = get_current_fy()
+# Filter ALL data to only include months up to the selected month
+df_all = df_all[df_all["month_end"] <= latest_month]
+
+# FY YTD cumulative (based on selected month's FY, not always current FY)
+cfy = assign_fy(pd.Timestamp(latest_month))
 df_fy_ytd = df_all[df_all["fy"] == cfy]
 fy_ytd_flow = df_fy_ytd["net_flow_cr"].sum()
 fy_ytd_months = df_fy_ytd["month_end"].nunique()
