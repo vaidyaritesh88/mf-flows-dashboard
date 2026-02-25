@@ -149,6 +149,21 @@ def agg_by_period(df, period, extra_group=None):
     return agg.sort_values("period_sort")
 
 
+def aggregate_period_schemes(df, period_months):
+    """Aggregate scheme-level data across multiple months for a period.
+    Flows are summed, AUM takes the last available month's value."""
+    df_p = df[df["month_end"].isin(period_months)].copy()
+    if df_p.empty:
+        return df_p
+    grp_cols = ["amc", "scheme_name", "category", "sub_category"]
+    available_grp = [c for c in grp_cols if c in df_p.columns]
+    agg = df_p.sort_values("month_end").groupby(available_grp, sort=False).agg(
+        net_flow_cr=("net_flow_cr", "sum"),
+        aum_cur_cr=("aum_cur_cr", "last"),
+    ).reset_index()
+    return agg
+
+
 def compute_yoy_growth(agg_df, value_col="aum_cr"):
     """Add YoY growth % column to an aggregated DataFrame.
     Compares each period to the period ~12 months prior."""
@@ -200,7 +215,7 @@ def db_has_data():
 
 @st.cache_data(ttl=3600)
 def load_data():
-    df = pl.load_flows(months=36)
+    df = pl.load_flows(months=120)
     if df.empty:
         return df
     df["month_end"] = pd.to_datetime(df["month_end"])
@@ -290,43 +305,77 @@ if df_all.empty:
     st.warning("No data matches filters.")
     st.stop()
 
-# ── Month selector (sidebar) ────────────────────────────────────────────────
-available_months = sorted(df_all["month_end"].unique(), reverse=True)
-available_month_labels = {m: pd.Timestamp(m).strftime("%b '%y") for m in available_months}
-
+# ── Period Selector (sidebar) ────────────────────────────────────────────────
 with st.sidebar:
-    st.markdown("### \U0001f4c5 Select Month")
-    selected_month = st.selectbox(
-        "Data Month",
-        available_months,
-        format_func=lambda m: available_month_labels[m],
-        key="month_selector",
+    st.markdown("### \U0001f4ca View Period")
+    period = st.radio(
+        "Aggregation",
+        ["Monthly", "Quarterly", "Financial Year", "FY YTD"],
+        horizontal=True,
+        index=0,
+        label_visibility="collapsed",
     )
 
-# ── Period Selector ──────────────────────────────────────────────────────────
-period = st.radio(
-    "View Period",
-    ["Monthly", "Quarterly", "Financial Year", "FY YTD"],
-    horizontal=True,
-    index=0,
-)
+# ── Period-aware selector (sidebar) ─────────────────────────────────────────
+if period == "Monthly":
+    available_periods = sorted(df_all["month_end"].unique(), reverse=True)
+    period_display = {m: pd.Timestamp(m).strftime("%b '%y") for m in available_periods}
+    with st.sidebar:
+        selected_period_key = st.selectbox(
+            "Select Month", available_periods,
+            format_func=lambda m: period_display[m], key="period_selector",
+        )
+    latest_month = selected_period_key
+    selected_period_months = [latest_month]
+    selected_period_lbl = pd.Timestamp(latest_month).strftime("%B %Y")
 
-# Latest month for reference — driven by sidebar selector
-latest_month = selected_month
-latest_month_lbl = pd.Timestamp(latest_month).strftime("%B %Y")
+elif period == "Quarterly":
+    _tmp = df_all.copy()
+    _tmp["_q"] = _tmp["month_end"].apply(assign_quarter)
+    q_max = _tmp.groupby("_q")["month_end"].max().sort_values(ascending=False)
+    quarter_list = q_max.index.tolist()
+    with st.sidebar:
+        selected_q = st.selectbox("Select Quarter", quarter_list, key="period_selector")
+    latest_month = q_max[selected_q]
+    selected_period_months = _tmp[_tmp["_q"] == selected_q]["month_end"].unique().tolist()
+    selected_period_lbl = selected_q
+
+elif period == "Financial Year":
+    _tmp = df_all.copy()
+    _tmp["_fy"] = _tmp["month_end"].apply(assign_fy)
+    fy_max = _tmp.groupby("_fy")["month_end"].max().sort_values(ascending=False)
+    fy_list = fy_max.index.tolist()
+    with st.sidebar:
+        selected_fy_val = st.selectbox("Select Financial Year", fy_list, key="period_selector")
+    latest_month = fy_max[selected_fy_val]
+    selected_period_months = _tmp[_tmp["_fy"] == selected_fy_val]["month_end"].unique().tolist()
+    selected_period_lbl = selected_fy_val
+
+elif period == "FY YTD":
+    _tmp = df_all.copy()
+    _tmp["_fy"] = _tmp["month_end"].apply(assign_fy)
+    fy_max = _tmp.groupby("_fy")["month_end"].max().sort_values(ascending=False)
+    fy_list = fy_max.index.tolist()
+    with st.sidebar:
+        selected_fy_val = st.selectbox("Select Financial Year", fy_list, key="period_selector")
+    latest_month = fy_max[selected_fy_val]
+    selected_period_months = _tmp[_tmp["_fy"] == selected_fy_val]["month_end"].unique().tolist()
+    selected_period_lbl = f"{selected_fy_val} YTD"
+
+latest_month_lbl = selected_period_lbl
 latest_month_date_str = pd.Timestamp(latest_month).strftime("%d-%b-%Y")
 
-# Filter ALL data to only include months up to the selected month
+# Filter ALL data to only include months up to the end of selected period
 df_all = df_all[df_all["month_end"] <= latest_month]
 
-# FY YTD cumulative (based on selected month's FY, not always current FY)
+# FY YTD cumulative (based on selected period's FY)
 cfy = assign_fy(pd.Timestamp(latest_month))
 df_fy_ytd = df_all[df_all["fy"] == cfy]
 fy_ytd_flow = df_fy_ytd["net_flow_cr"].sum()
 fy_ytd_months = df_fy_ytd["month_end"].nunique()
 
-# Latest month aggregates
-df_latest = df_all[df_all["month_end"] == latest_month]
+# Latest PERIOD aggregates (scheme data summed across period months)
+df_latest = aggregate_period_schemes(df_all, selected_period_months)
 total_flow_latest = df_latest["net_flow_cr"].sum()
 total_aum_latest = df_latest["aum_cur_cr"].sum()
 n_schemes = df_latest["scheme_name"].nunique()
@@ -941,7 +990,7 @@ with tab3:
         st.warning(f"No data for {sel_amc} / {sel_subcat}.")
     else:
         # ── AMC KPIs ──────────────────────────────────────────────
-        df_amc_latest = df_amc[df_amc["month_end"] == latest_month]
+        df_amc_latest = aggregate_period_schemes(df_amc, selected_period_months)
         amc_flow = df_amc_latest["net_flow_cr"].sum()
         amc_aum = df_amc_latest["aum_cur_cr"].sum()
         amc_n = df_amc_latest["scheme_name"].nunique()
@@ -1115,9 +1164,11 @@ with tab3:
         # ── Category Breakdown (if showing all scheme types) ──────
         if sel_subcat == "All Scheme Types" and not df_amc_latest.empty:
             st.markdown(
-                "<div class='section-header'>Category Breakdown</div>",
+                f"<div class='section-header'>Category Breakdown \u2014 "
+                f"{sel_amc} \u2014 {latest_month_lbl}</div>",
                 unsafe_allow_html=True,
             )
+            st.caption(f"Data as of {latest_month_date_str}")
             amc_cat = (
                 df_amc_latest.groupby("sub_category")
                 .agg(net_flow=("net_flow_cr", "sum"), aum=("aum_cur_cr", "sum"))
