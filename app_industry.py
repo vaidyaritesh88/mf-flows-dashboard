@@ -149,6 +149,26 @@ def agg_by_period(df, period, extra_group=None):
     return agg.sort_values("period_sort")
 
 
+def compute_yoy_growth(agg_df, value_col="aum_cr"):
+    """Add YoY growth % column to an aggregated DataFrame.
+    Compares each period to the period ~12 months prior."""
+    agg_df = agg_df.reset_index(drop=True).copy()
+    yoy = []
+    for i, row in agg_df.iterrows():
+        target = row["period_sort"] - pd.DateOffset(years=1)
+        prev = agg_df[agg_df["period_sort"].between(
+            target - pd.Timedelta(days=45), target + pd.Timedelta(days=45)
+        )]
+        if not prev.empty and prev.iloc[0][value_col] > 0:
+            yoy.append(
+                (row[value_col] - prev.iloc[0][value_col]) / prev.iloc[0][value_col] * 100
+            )
+        else:
+            yoy.append(None)
+    agg_df["yoy_pct"] = yoy
+    return agg_df
+
+
 # ── Helpers ──────────────────────────────────────────────────────────────────
 def fmt_cr(val):
     if pd.isna(val):
@@ -270,6 +290,18 @@ if df_all.empty:
     st.warning("No data matches filters.")
     st.stop()
 
+# ── Month selector (sidebar) ────────────────────────────────────────────────
+available_months = sorted(df_all["month_end"].unique(), reverse=True)
+available_month_labels = {m: pd.Timestamp(m).strftime("%b '%y") for m in available_months}
+
+with st.sidebar:
+    st.markdown("### \U0001f4c5 Select Month")
+    selected_month = st.selectbox(
+        "Data Month",
+        available_months,
+        format_func=lambda m: available_month_labels[m],
+        key="month_selector",
+    )
 
 # ── Period Selector ──────────────────────────────────────────────────────────
 period = st.radio(
@@ -279,9 +311,10 @@ period = st.radio(
     index=0,
 )
 
-# Latest month for reference
-latest_month = df_all["month_end"].max()
+# Latest month for reference — driven by sidebar selector
+latest_month = selected_month
 latest_month_lbl = pd.Timestamp(latest_month).strftime("%B %Y")
+latest_month_date_str = pd.Timestamp(latest_month).strftime("%d-%b-%Y")
 
 # FY YTD cumulative
 cfy = get_current_fy()
@@ -301,7 +334,9 @@ flow_pct_latest = (total_flow_latest / total_aum_latest * 100) if total_aum_late
 # ── KPIs ─────────────────────────────────────────────────────────────────────
 st.markdown(
     f"<div class='section-header'>\U0001f4cc Industry Snapshot \u2014 "
-    f"{latest_month_lbl}</div>",
+    f"{latest_month_lbl}</div>"
+    f"<div style='font-size:13px; color:#6b7280; margin-top:-12px; margin-bottom:12px; "
+    f"padding-left:13px;'>Data as of {latest_month_date_str}</div>",
     unsafe_allow_html=True,
 )
 
@@ -394,22 +429,8 @@ with tab1:
             unsafe_allow_html=True,
         )
 
-        aum_agg = ind_agg.copy()
+        aum_agg = compute_yoy_growth(ind_agg)
         aum_labels = [fmt_cr(v) for v in aum_agg["aum_cr"]]
-
-        # Compute YoY: compare to period 12 months prior (approximate)
-        aum_agg = aum_agg.reset_index(drop=True)
-        yoy = []
-        for i, row in aum_agg.iterrows():
-            target = row["period_sort"] - pd.DateOffset(years=1)
-            prev = aum_agg[aum_agg["period_sort"].between(
-                target - pd.Timedelta(days=45), target + pd.Timedelta(days=45)
-            )]
-            if not prev.empty and prev.iloc[0]["aum_cr"] > 0:
-                yoy.append((row["aum_cr"] - prev.iloc[0]["aum_cr"]) / prev.iloc[0]["aum_cr"] * 100)
-            else:
-                yoy.append(None)
-        aum_agg["yoy_pct"] = yoy
 
         fig_aum = make_subplots(specs=[[{"secondary_y": True}]])
         fig_aum.add_trace(go.Bar(
@@ -556,6 +577,87 @@ with tab2:
     if df_tab2.empty:
         st.warning("No data for selected scheme type.")
     else:
+        # ── Scheme-Type Aggregate Charts (when specific type selected) ──
+        if scheme_type_filter != "All Scheme Types":
+            st.markdown(
+                f"<div class='section-header'>{scheme_type_filter} \u2014 "
+                f"Industry Overview</div>",
+                unsafe_allow_html=True,
+            )
+
+            stype_agg = agg_by_period(df_tab2, period)
+
+            if not stype_agg.empty:
+                # Chart A: Net Inflow time-series + Flow/AUM %
+                fig_stype_flow = make_subplots(specs=[[{"secondary_y": True}]])
+                sflow_colors = [COLOR_POS if v >= 0 else COLOR_NEG
+                                for v in stype_agg["net_flow_cr"]]
+                sflow_labels = [fmt_cr(v) for v in stype_agg["net_flow_cr"]]
+
+                fig_stype_flow.add_trace(go.Bar(
+                    x=stype_agg["period_label"], y=stype_agg["net_flow_cr"],
+                    name="Net Flow", marker_color=sflow_colors, opacity=0.85,
+                    text=sflow_labels, textposition="outside", textfont=dict(size=11),
+                    hovertemplate="Net Flow: \u20b9%{y:,.0f} Cr<extra></extra>",
+                ), secondary_y=False)
+
+                fig_stype_flow.add_trace(go.Scatter(
+                    x=stype_agg["period_label"], y=stype_agg["flow_pct"],
+                    name="Flow / AUM %", line=dict(color="#7c3aed", width=2.5),
+                    mode="lines+markers", marker=dict(size=6),
+                    hovertemplate="Flow/AUM: %{y:+.1f}%<extra></extra>",
+                ), secondary_y=True)
+
+                fig_stype_flow.update_layout(
+                    height=420, barmode="relative",
+                    legend=dict(orientation="h", y=1.08, font=dict(size=12)),
+                    **CHART_THEME, hovermode="x",
+                    xaxis=dict(**AXIS_STYLE, tickfont=dict(size=12)),
+                    yaxis=dict(title="Net Flow (\u20b9 Cr)", zeroline=True,
+                               zerolinecolor="#d1d5db", **AXIS_STYLE),
+                    yaxis2=dict(title="Flow / AUM (%)", gridcolor="rgba(0,0,0,0)",
+                                ticksuffix="%", zeroline=True, zerolinecolor="#d1d5db"),
+                )
+                st.plotly_chart(fig_stype_flow, use_container_width=True)
+
+                # Chart B: AUM time-series + YoY Growth
+                st.markdown(
+                    f"<div class='section-header'>{scheme_type_filter} \u2014 "
+                    f"AUM & YoY Growth</div>",
+                    unsafe_allow_html=True,
+                )
+
+                stype_aum = compute_yoy_growth(stype_agg)
+                aum_labels_s = [fmt_cr(v) for v in stype_aum["aum_cr"]]
+
+                fig_stype_aum = make_subplots(specs=[[{"secondary_y": True}]])
+                fig_stype_aum.add_trace(go.Bar(
+                    x=stype_aum["period_label"], y=stype_aum["aum_cr"],
+                    name="AUM", marker_color=COLOR_AUM, opacity=0.85,
+                    text=aum_labels_s, textposition="outside", textfont=dict(size=11),
+                    hovertemplate="AUM: \u20b9%{y:,.0f} Cr<extra></extra>",
+                ), secondary_y=False)
+
+                fig_stype_aum.add_trace(go.Scatter(
+                    x=stype_aum["period_label"], y=stype_aum["yoy_pct"],
+                    name="YoY AUM Growth %", line=dict(color="#f59e0b", width=2.5),
+                    mode="lines+markers", marker=dict(size=6), connectgaps=True,
+                    hovertemplate="YoY: %{y:+.1f}%<extra></extra>",
+                ), secondary_y=True)
+
+                fig_stype_aum.update_layout(
+                    height=420, barmode="relative",
+                    legend=dict(orientation="h", y=1.08, font=dict(size=12)),
+                    **CHART_THEME, hovermode="x",
+                    xaxis=dict(**AXIS_STYLE, tickfont=dict(size=12)),
+                    yaxis=dict(title="AUM (\u20b9 Cr)", **AXIS_STYLE),
+                    yaxis2=dict(title="YoY Growth (%)", gridcolor="rgba(0,0,0,0)",
+                                ticksuffix="%"),
+                )
+                st.plotly_chart(fig_stype_aum, use_container_width=True)
+
+            st.markdown("---")
+
         # Aggregate by AMC for selected period
         amc_agg = agg_by_period(df_tab2, period, extra_group=["amc"])
 
@@ -569,10 +671,11 @@ with tab2:
         total_flow_period = amc_latest["net_flow_cr"].sum()
         total_aum_period = amc_latest["aum_cr"].sum()
 
-        # Compute market shares
+        # Compute market shares (use abs total so signs are preserved correctly)
+        abs_total_flow = abs(total_flow_period)
         amc_latest["flow_share"] = np.where(
-            total_flow_period != 0,
-            amc_latest["net_flow_cr"] / total_flow_period * 100, 0
+            abs_total_flow > 0,
+            amc_latest["net_flow_cr"] / abs_total_flow * 100, 0
         )
         amc_latest["aum_share"] = np.where(
             total_aum_period > 0,
@@ -610,30 +713,38 @@ with tab2:
         st.plotly_chart(fig_amc_flow, use_container_width=True)
 
         # ── AMC Net Inflow Market Share % ─────────────────────────
+        _share_suffix = " (Net Outflow Period)" if total_flow_period < 0 else ""
         st.markdown(
             f"<div class='section-header'>AMC Net Inflow Market Share (%) \u2014 "
-            f"{latest_period_lbl}</div>",
+            f"{latest_period_lbl}{_share_suffix}</div>",
             unsafe_allow_html=True,
         )
 
-        amc_flow_share = amc_latest[amc_latest["net_flow_cr"] > 0].sort_values("flow_share")
-        amc_flow_share = amc_flow_share.tail(20)  # top 20 by share
+        # Show top 15 positive + bottom 5 negative share AMCs
+        amc_flow_share = amc_latest.sort_values("flow_share")
+        amc_flow_share_top = pd.concat([
+            amc_flow_share[amc_flow_share["flow_share"] > 0].nlargest(15, "flow_share"),
+            amc_flow_share[amc_flow_share["flow_share"] < 0].nsmallest(5, "flow_share"),
+        ]).drop_duplicates().sort_values("flow_share")
+
+        share_colors = [COLOR_POS if v >= 0 else COLOR_NEG
+                        for v in amc_flow_share_top["flow_share"]]
 
         fig_flow_share = go.Figure(go.Bar(
-            x=amc_flow_share["flow_share"], y=amc_flow_share["amc"],
-            orientation="h", marker_color=COLOR_POS, opacity=0.85,
-            text=[f"{v:.1f}% ({fmt_cr(f)})" for v, f in
-                  zip(amc_flow_share["flow_share"], amc_flow_share["net_flow_cr"])],
+            x=amc_flow_share_top["flow_share"], y=amc_flow_share_top["amc"],
+            orientation="h", marker_color=share_colors, opacity=0.85,
+            text=[f"{v:+.1f}% ({fmt_cr(f)})" for v, f in
+                  zip(amc_flow_share_top["flow_share"], amc_flow_share_top["net_flow_cr"])],
             textposition="outside", textfont=dict(size=10), cliponaxis=False,
             hovertemplate=(
                 "<b>%{y}</b><br>"
-                "Inflow Share: %{x:.1f}%<br>"
+                "Flow Share: %{x:+.1f}%<br>"
                 "Net Flow: \u20b9%{customdata:,.0f} Cr<extra></extra>"
             ),
-            customdata=amc_flow_share["net_flow_cr"],
+            customdata=amc_flow_share_top["net_flow_cr"],
         ))
         fig_flow_share.update_layout(
-            height=max(500, len(amc_flow_share) * 28),
+            height=max(500, len(amc_flow_share_top) * 28),
             **CHART_THEME, showlegend=False,
             margin=dict(r=180, l=10),
             xaxis=dict(title="Net Inflow Share (%)", ticksuffix="%", **AXIS_STYLE),
@@ -739,8 +850,8 @@ with tab2:
             ).reset_index()
             amc_share_flow = amc_agg.merge(period_flow_totals, on="period_label")
             amc_share_flow["flow_share_pct"] = np.where(
-                amc_share_flow["total_flow"] != 0,
-                (amc_share_flow["net_flow_cr"] / amc_share_flow["total_flow"] * 100).round(1),
+                amc_share_flow["total_flow"].abs() > 0,
+                (amc_share_flow["net_flow_cr"] / amc_share_flow["total_flow"].abs() * 100).round(1),
                 0,
             )
 
@@ -840,7 +951,9 @@ with tab3:
         subcat_lbl = f" \u2014 {sel_subcat}" if sel_subcat != "All Scheme Types" else ""
         st.markdown(
             f"<div class='section-header'>{sel_amc}{subcat_lbl} \u2014 "
-            f"{latest_month_lbl}</div>",
+            f"{latest_month_lbl}</div>"
+            f"<div style='font-size:13px; color:#6b7280; margin-top:-12px; margin-bottom:12px; "
+            f"padding-left:13px;'>Data as of {latest_month_date_str}</div>",
             unsafe_allow_html=True,
         )
 
@@ -895,13 +1008,43 @@ with tab3:
             )
             st.plotly_chart(fig_amc_ts, use_container_width=True)
 
+        # ── AMC AUM Time-Series ──────────────────────────────────
+        st.markdown(
+            "<div class='section-header'>AUM & YoY Growth</div>",
+            unsafe_allow_html=True,
+        )
+
+        if not amc_period.empty and len(amc_period) > 0:
+            amc_aum_ts = compute_yoy_growth(amc_period)
+            aum_labels_amc = [fmt_cr(v) for v in amc_aum_ts["aum_cr"]]
+
+            fig_amc_aum = make_subplots(specs=[[{"secondary_y": True}]])
+            fig_amc_aum.add_trace(go.Bar(
+                x=amc_aum_ts["period_label"], y=amc_aum_ts["aum_cr"],
+                name="AUM", marker_color=COLOR_AUM, opacity=0.85,
+                text=aum_labels_amc, textposition="outside", textfont=dict(size=10),
+                hovertemplate="AUM: \u20b9%{y:,.0f} Cr<extra></extra>",
+            ), secondary_y=False)
+
+            fig_amc_aum.add_trace(go.Scatter(
+                x=amc_aum_ts["period_label"], y=amc_aum_ts["yoy_pct"],
+                name="YoY AUM Growth %", line=dict(color="#f59e0b", width=2.5),
+                mode="lines+markers", marker=dict(size=5), connectgaps=True,
+                hovertemplate="YoY: %{y:+.1f}%<extra></extra>",
+            ), secondary_y=True)
+
+            fig_amc_aum.update_layout(
+                height=420, **CHART_THEME, hovermode="x",
+                legend=dict(orientation="h", y=1.08, font=dict(size=11)),
+                xaxis=dict(**AXIS_STYLE, tickfont=dict(size=11)),
+                yaxis=dict(title="AUM (\u20b9 Cr)", **AXIS_STYLE),
+                yaxis2=dict(title="YoY Growth (%)", gridcolor="rgba(0,0,0,0)",
+                            ticksuffix="%"),
+            )
+            st.plotly_chart(fig_amc_aum, use_container_width=True)
+
         # ── Which AMCs doing well in this scheme type? ────────────
         if sel_subcat != "All Scheme Types":
-            st.markdown(
-                f"<div class='section-header'>AMC Comparison \u2014 "
-                f"{sel_subcat}</div>",
-                unsafe_allow_html=True,
-            )
             df_subcat = df_all[df_all["sub_category"] == sel_subcat]
             subcat_amc_agg = agg_by_period(df_subcat, period, extra_group=["amc"])
 
@@ -910,6 +1053,14 @@ with tab3:
                 sp_latest = subcat_amc_agg[
                     subcat_amc_agg["period_sort"] == subcat_amc_agg["period_sort"].max()
                 ].sort_values("net_flow_cr")
+                sp_latest_period_lbl = sp_latest["period_label"].iloc[0] if not sp_latest.empty else ""
+
+                st.markdown(
+                    f"<div class='section-header'>AMC Comparison \u2014 "
+                    f"{sel_subcat} \u2014 {sp_latest_period_lbl}</div>",
+                    unsafe_allow_html=True,
+                )
+                st.caption(f"Data as of {latest_month_date_str}")
 
                 fig_subcat_rank = go.Figure(go.Bar(
                     x=sp_latest["net_flow_cr"], y=sp_latest["amc"],
@@ -989,52 +1140,62 @@ with tab3:
         if not df_amc_latest.empty:
             col_l, col_r = st.columns(2)
             with col_l:
-                st.markdown("**\U0001f7e2 Top Inflow Schemes**")
-                top_in = df_amc_latest.nlargest(10, "net_flow_cr")[
-                    ["scheme_name", "net_flow_cr", "aum_cur_cr"]
-                ].copy()
-                top_in["short"] = top_in["scheme_name"].apply(
-                    lambda s: s.split(" ", 2)[-1] if " " in s else s
-                )
-                sorted_in = top_in.sort_values("net_flow_cr")
-                fig_in = go.Figure(go.Bar(
-                    x=sorted_in["net_flow_cr"], y=sorted_in["short"],
-                    orientation="h", marker_color=COLOR_POS,
-                    text=[fmt_cr(v) for v in sorted_in["net_flow_cr"]],
-                    textposition="outside", textfont=dict(size=10), cliponaxis=False,
-                    hovertemplate="<b>%{y}</b>: \u20b9%{x:,.0f} Cr<extra></extra>",
-                ))
-                fig_in.update_layout(
-                    height=380, **CHART_THEME, showlegend=False,
-                    margin=dict(r=80),
-                    xaxis=dict(**AXIS_STYLE),
-                    yaxis=dict(tickfont=dict(size=10), **AXIS_STYLE),
-                )
-                st.plotly_chart(fig_in, use_container_width=True)
+                st.markdown(f"**\U0001f7e2 Top Inflow Schemes \u2014 {sel_amc} \u2014 {latest_month_lbl}**")
+                st.caption(f"Data as of {latest_month_date_str}")
+                df_positive = df_amc_latest[df_amc_latest["net_flow_cr"] > 0]
+                if df_positive.empty:
+                    st.info("No schemes with positive inflows this period.")
+                else:
+                    top_in = df_positive.nlargest(10, "net_flow_cr")[
+                        ["scheme_name", "net_flow_cr", "aum_cur_cr"]
+                    ].copy()
+                    top_in["short"] = top_in["scheme_name"].apply(
+                        lambda s: s.split(" ", 2)[-1] if " " in s else s
+                    )
+                    sorted_in = top_in.sort_values("net_flow_cr")
+                    fig_in = go.Figure(go.Bar(
+                        x=sorted_in["net_flow_cr"], y=sorted_in["short"],
+                        orientation="h", marker_color=COLOR_POS,
+                        text=[fmt_cr(v) for v in sorted_in["net_flow_cr"]],
+                        textposition="outside", textfont=dict(size=10), cliponaxis=False,
+                        hovertemplate="<b>%{y}</b>: \u20b9%{x:,.0f} Cr<extra></extra>",
+                    ))
+                    fig_in.update_layout(
+                        height=380, **CHART_THEME, showlegend=False,
+                        margin=dict(r=80),
+                        xaxis=dict(**AXIS_STYLE),
+                        yaxis=dict(tickfont=dict(size=10), **AXIS_STYLE),
+                    )
+                    st.plotly_chart(fig_in, use_container_width=True)
 
             with col_r:
-                st.markdown("**\U0001f534 Top Outflow Schemes**")
-                top_out = df_amc_latest.nsmallest(10, "net_flow_cr")[
-                    ["scheme_name", "net_flow_cr", "aum_cur_cr"]
-                ].copy()
-                top_out["short"] = top_out["scheme_name"].apply(
-                    lambda s: s.split(" ", 2)[-1] if " " in s else s
-                )
-                sorted_out = top_out.sort_values("net_flow_cr", ascending=False)
-                fig_out = go.Figure(go.Bar(
-                    x=sorted_out["net_flow_cr"], y=sorted_out["short"],
-                    orientation="h", marker_color=COLOR_NEG,
-                    text=[fmt_cr(v) for v in sorted_out["net_flow_cr"]],
-                    textposition="outside", textfont=dict(size=10), cliponaxis=False,
-                    hovertemplate="<b>%{y}</b>: \u20b9%{x:,.0f} Cr<extra></extra>",
-                ))
-                fig_out.update_layout(
-                    height=380, **CHART_THEME, showlegend=False,
-                    margin=dict(l=80),
-                    xaxis=dict(**AXIS_STYLE),
-                    yaxis=dict(tickfont=dict(size=10), **AXIS_STYLE),
-                )
-                st.plotly_chart(fig_out, use_container_width=True)
+                st.markdown(f"**\U0001f534 Top Outflow Schemes \u2014 {sel_amc} \u2014 {latest_month_lbl}**")
+                st.caption(f"Data as of {latest_month_date_str}")
+                df_negative = df_amc_latest[df_amc_latest["net_flow_cr"] < 0]
+                if df_negative.empty:
+                    st.info("No schemes with outflows this period.")
+                else:
+                    top_out = df_negative.nsmallest(10, "net_flow_cr")[
+                        ["scheme_name", "net_flow_cr", "aum_cur_cr"]
+                    ].copy()
+                    top_out["short"] = top_out["scheme_name"].apply(
+                        lambda s: s.split(" ", 2)[-1] if " " in s else s
+                    )
+                    sorted_out = top_out.sort_values("net_flow_cr", ascending=False)
+                    fig_out = go.Figure(go.Bar(
+                        x=sorted_out["net_flow_cr"], y=sorted_out["short"],
+                        orientation="h", marker_color=COLOR_NEG,
+                        text=[fmt_cr(v) for v in sorted_out["net_flow_cr"]],
+                        textposition="outside", textfont=dict(size=10), cliponaxis=False,
+                        hovertemplate="<b>%{y}</b>: \u20b9%{x:,.0f} Cr<extra></extra>",
+                    ))
+                    fig_out.update_layout(
+                        height=380, **CHART_THEME, showlegend=False,
+                        margin=dict(l=80),
+                        xaxis=dict(**AXIS_STYLE),
+                        yaxis=dict(tickfont=dict(size=10), **AXIS_STYLE),
+                    )
+                    st.plotly_chart(fig_out, use_container_width=True)
 
 
 # ═══════════════════════════════════════════════════════════════════════
