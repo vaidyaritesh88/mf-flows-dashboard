@@ -1164,7 +1164,7 @@ with tab3:
         # ── Category Breakdown (if showing all scheme types) ──────
         if sel_subcat == "All Scheme Types" and not df_amc_latest.empty:
             st.markdown(
-                f"<div class='section-header'>Category Breakdown \u2014 "
+                f"<div class='section-header'>Net Flow by Category \u2014 "
                 f"{sel_amc} \u2014 {latest_month_lbl}</div>",
                 unsafe_allow_html=True,
             )
@@ -1257,6 +1257,162 @@ with tab3:
                 lambda x: f"{x:,.0f}" if pd.notna(x) else "—")
             cat_summary["AUM Share %"] = cat_summary["AUM Share %"].apply(lambda x: f"{x:.1f}%")
             st.dataframe(cat_summary, use_container_width=True, hide_index=True)
+
+        # ── AUM Mix Over Time (100% Stacked Bars) ─────────────────
+        n_months = df_amc["month_end"].nunique()
+        if n_months > 1:
+            st.markdown(
+                f"<div class='section-header'>AUM Mix Over Time \u2014 "
+                f"{sel_amc}</div>",
+                unsafe_allow_html=True,
+            )
+
+            # --- Helper: identify top contributors covering ~80% of AUM ---
+            def _top_contributors(ts_df, group_col, threshold=0.80):
+                latest_m = ts_df["month_end"].max()
+                latest = ts_df[ts_df["month_end"] == latest_m]
+                ranked = latest.sort_values("aum", ascending=False)
+                total = ranked["aum"].sum()
+                cum, top = 0, []
+                for _, r in ranked.iterrows():
+                    cum += r["aum"]
+                    top.append(r[group_col])
+                    if cum / total >= threshold:
+                        break
+                return top
+
+            # ─── Category-wise 100% stacked bar ───
+            if sel_subcat == "All Scheme Types":
+                col_cat_ts, col_sch_ts = st.columns(2)
+            else:
+                col_sch_ts = st.container()
+
+            if sel_subcat == "All Scheme Types":
+                with col_cat_ts:
+                    st.markdown("**Category-wise AUM Mix**")
+                    cat_ts = (
+                        df_amc.groupby(["month_end", "sub_category"])
+                        .agg(aum=("aum_cur_cr", "sum"))
+                        .reset_index()
+                    )
+                    top_cats = _top_contributors(cat_ts, "sub_category")
+                    cat_ts["display"] = cat_ts["sub_category"].apply(
+                        lambda x: x if x in top_cats else "Others"
+                    )
+                    cat_ts_agg = (
+                        cat_ts.groupby(["month_end", "display"])
+                        .agg(aum=("aum", "sum")).reset_index()
+                    )
+                    mt = cat_ts_agg.groupby("month_end")["aum"].transform("sum")
+                    cat_ts_agg["pct"] = (cat_ts_agg["aum"] / mt * 100).round(1)
+                    cat_ts_agg["month_lbl"] = pd.to_datetime(
+                        cat_ts_agg["month_end"]
+                    ).dt.strftime("%b %Y")
+                    cat_ts_agg = cat_ts_agg.sort_values("month_end")
+
+                    cat_order = top_cats + (
+                        ["Others"] if "Others" in cat_ts_agg["display"].values else []
+                    )
+                    palette_s = px.colors.qualitative.Set2
+                    fig_cat_s = go.Figure()
+                    for i, cat in enumerate(cat_order):
+                        sub = cat_ts_agg[cat_ts_agg["display"] == cat].sort_values("month_end")
+                        fig_cat_s.add_trace(go.Bar(
+                            x=sub["month_lbl"], y=sub["pct"], name=cat,
+                            marker_color=(
+                                palette_s[i % len(palette_s)]
+                                if cat != "Others" else "#d1d5db"
+                            ),
+                            hovertemplate=(
+                                f"<b>{cat}</b><br>"
+                                "%{y:.1f}%<br>"
+                                "\u20b9%{customdata:,.0f} Cr<extra></extra>"
+                            ),
+                            customdata=sub["aum"],
+                            text=sub["pct"].apply(
+                                lambda x: f"{x:.0f}%" if x >= 5 else ""
+                            ),
+                            textposition="inside",
+                            textfont=dict(size=9, color="white"),
+                        ))
+                    fig_cat_s.update_layout(
+                        barmode="stack", height=480, **CHART_THEME,
+                        yaxis=dict(title="AUM Share %", range=[0, 100], **AXIS_STYLE),
+                        xaxis=dict(tickangle=-45, **AXIS_STYLE),
+                        legend=dict(
+                            orientation="h", yanchor="bottom", y=1.02,
+                            font=dict(size=10),
+                        ),
+                        margin=dict(b=80),
+                    )
+                    st.plotly_chart(fig_cat_s, use_container_width=True)
+
+            # ─── Scheme-wise 100% stacked bar ───
+            with col_sch_ts:
+                st.markdown("**Scheme-wise AUM Mix**")
+                sch_ts = (
+                    df_amc.groupby(["month_end", "scheme_name"])
+                    .agg(aum=("aum_cur_cr", "sum"))
+                    .reset_index()
+                )
+                top_schemes = _top_contributors(sch_ts, "scheme_name")
+
+                # Short names for readability
+                def _short(s):
+                    parts = s.split(" ", 2)
+                    return parts[-1] if len(parts) > 2 else s
+
+                scheme_short = {s: _short(s) for s in top_schemes}
+                sch_ts["display"] = sch_ts["scheme_name"].apply(
+                    lambda x: scheme_short.get(x, x) if x in top_schemes else "Others"
+                )
+                sch_ts_agg = (
+                    sch_ts.groupby(["month_end", "display"])
+                    .agg(aum=("aum", "sum")).reset_index()
+                )
+                mt_s = sch_ts_agg.groupby("month_end")["aum"].transform("sum")
+                sch_ts_agg["pct"] = (sch_ts_agg["aum"] / mt_s * 100).round(1)
+                sch_ts_agg["month_lbl"] = pd.to_datetime(
+                    sch_ts_agg["month_end"]
+                ).dt.strftime("%b %Y")
+                sch_ts_agg = sch_ts_agg.sort_values("month_end")
+
+                sch_order = [scheme_short[s] for s in top_schemes] + (
+                    ["Others"] if "Others" in sch_ts_agg["display"].values else []
+                )
+                palette_p = px.colors.qualitative.Plotly
+                fig_sch_s = go.Figure()
+                for i, sch in enumerate(sch_order):
+                    sub = sch_ts_agg[sch_ts_agg["display"] == sch].sort_values("month_end")
+                    fig_sch_s.add_trace(go.Bar(
+                        x=sub["month_lbl"], y=sub["pct"], name=sch,
+                        marker_color=(
+                            palette_p[i % len(palette_p)]
+                            if sch != "Others" else "#d1d5db"
+                        ),
+                        hovertemplate=(
+                            f"<b>{sch}</b><br>"
+                            "%{y:.1f}%<br>"
+                            "\u20b9%{customdata:,.0f} Cr<extra></extra>"
+                        ),
+                        customdata=sub["aum"],
+                        text=sub["pct"].apply(
+                            lambda x: f"{x:.0f}%" if x >= 5 else ""
+                        ),
+                        textposition="inside",
+                        textfont=dict(size=9, color="white"),
+                    ))
+                fig_sch_s.update_layout(
+                    barmode="stack", height=480, **CHART_THEME,
+                    yaxis=dict(title="AUM Share %", range=[0, 100], **AXIS_STYLE),
+                    xaxis=dict(tickangle=-45, **AXIS_STYLE),
+                    legend=dict(
+                        orientation="h", yanchor="bottom", y=1.02,
+                        font=dict(size=10),
+                    ),
+                    margin=dict(b=80),
+                )
+                st.plotly_chart(fig_sch_s, use_container_width=True)
 
         # ── Top Schemes by AUM ────────────────────────────────────
         if not df_amc_latest.empty:
