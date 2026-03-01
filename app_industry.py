@@ -1190,6 +1190,160 @@ with tab3:
             )
             st.plotly_chart(fig_ac, use_container_width=True)
 
+        # ── AUM Split by Category ─────────────────────────────────
+        if sel_subcat == "All Scheme Types" and not df_amc_latest.empty:
+            st.markdown(
+                f"<div class='section-header'>AUM Split by Category — "
+                f"{sel_amc} — {latest_month_lbl}</div>",
+                unsafe_allow_html=True,
+            )
+            st.caption(f"Data as of {latest_month_date_str}")
+
+            aum_by_cat = (
+                df_amc_latest.groupby("sub_category")
+                .agg(aum=("aum_cur_cr", "sum"), flow=("net_flow_cr", "sum"))
+                .reset_index().sort_values("aum", ascending=False)
+            )
+            aum_by_cat["share"] = (aum_by_cat["aum"] / aum_by_cat["aum"].sum() * 100).round(1)
+
+            col_donut, col_bar = st.columns(2)
+
+            with col_donut:
+                fig_donut = px.pie(
+                    aum_by_cat, values="aum", names="sub_category", hole=0.45,
+                    color_discrete_sequence=px.colors.qualitative.Set2,
+                )
+                fig_donut.update_traces(
+                    textinfo="label+percent",
+                    textposition="outside",
+                    textfont=dict(size=10),
+                    hovertemplate="<b>%{label}</b><br>AUM: ₹%{value:,.0f} Cr<br>Share: %{percent}<extra></extra>",
+                )
+                fig_donut.update_layout(
+                    height=420, showlegend=False,
+                    **CHART_THEME,
+                    annotations=[dict(
+                        text=f"<b>{fmt_cr(aum_by_cat['aum'].sum())}</b><br>Total AUM",
+                        x=0.5, y=0.5, font_size=14, showarrow=False,
+                        font=dict(color="#1f2937"),
+                    )],
+                )
+                st.plotly_chart(fig_donut, use_container_width=True)
+
+            with col_bar:
+                aum_sorted = aum_by_cat.sort_values("aum")
+                fig_aum_cat_bar = go.Figure(go.Bar(
+                    x=aum_sorted["aum"], y=aum_sorted["sub_category"],
+                    orientation="h", marker_color=COLOR_AUM, opacity=0.85,
+                    text=[f"{fmt_cr(a)} ({s:.1f}%)" for a, s in
+                          zip(aum_sorted["aum"], aum_sorted["share"])],
+                    textposition="outside", textfont=dict(size=10), cliponaxis=False,
+                    hovertemplate="<b>%{y}</b><br>AUM: ₹%{x:,.0f} Cr<extra></extra>",
+                ))
+                fig_aum_cat_bar.update_layout(
+                    height=420, **CHART_THEME, showlegend=False,
+                    margin=dict(r=160, l=10),
+                    xaxis=dict(title="AUM (₹ Cr)", **AXIS_STYLE),
+                    yaxis=dict(tickfont=dict(size=10), **AXIS_STYLE),
+                )
+                st.plotly_chart(fig_aum_cat_bar, use_container_width=True)
+
+            # ── Category AUM Summary Table ────────────────────────
+            cat_summary = aum_by_cat.copy()
+            cat_summary.columns = ["Category", "AUM (₹ Cr)", "Net Flow (₹ Cr)", "AUM Share %"]
+            cat_summary["AUM (₹ Cr)"] = cat_summary["AUM (₹ Cr)"].apply(lambda x: round(x, 0))
+            cat_summary["Net Flow (₹ Cr)"] = cat_summary["Net Flow (₹ Cr)"].apply(lambda x: round(x, 0))
+            cat_summary["AUM Share %"] = cat_summary["AUM Share %"].apply(lambda x: f"{x:.1f}%")
+            st.dataframe(cat_summary, use_container_width=True, hide_index=True)
+
+        # ── Top Schemes by AUM ────────────────────────────────────
+        if not df_amc_latest.empty:
+            st.markdown(
+                f"<div class='section-header'>Top Schemes by AUM — "
+                f"{sel_amc} — {latest_month_lbl}</div>",
+                unsafe_allow_html=True,
+            )
+            st.caption(f"Data as of {latest_month_date_str}")
+
+            top_aum_schemes = df_amc_latest.nlargest(15, "aum_cur_cr")[
+                ["scheme_name", "sub_category", "aum_cur_cr", "net_flow_cr"]
+            ].copy()
+            top_aum_schemes["short"] = top_aum_schemes["scheme_name"].apply(
+                lambda s: s.split(" ", 2)[-1] if " " in s else s
+            )
+            top_aum_schemes["aum_share"] = (
+                top_aum_schemes["aum_cur_cr"] / df_amc_latest["aum_cur_cr"].sum() * 100
+            ).round(1)
+
+            sorted_aum_sch = top_aum_schemes.sort_values("aum_cur_cr")
+            palette_cats = px.colors.qualitative.Set2
+            cat_list = sorted(df_amc_latest["sub_category"].unique())
+            cat_color_map = {c: palette_cats[i % len(palette_cats)] for i, c in enumerate(cat_list)}
+
+            fig_top_aum = go.Figure(go.Bar(
+                x=sorted_aum_sch["aum_cur_cr"], y=sorted_aum_sch["short"],
+                orientation="h",
+                marker_color=[cat_color_map.get(c, COLOR_AUM) for c in sorted_aum_sch["sub_category"]],
+                opacity=0.85,
+                text=[f"{fmt_cr(a)} ({s:.1f}%)" for a, s in
+                      zip(sorted_aum_sch["aum_cur_cr"], sorted_aum_sch["aum_share"])],
+                textposition="outside", textfont=dict(size=10), cliponaxis=False,
+                hovertemplate=(
+                    "<b>%{y}</b><br>"
+                    "AUM: ₹%{x:,.0f} Cr<br>"
+                    "Category: %{customdata[0]}<br>"
+                    "Net Flow: ₹%{customdata[1]:,.0f} Cr<extra></extra>"
+                ),
+                customdata=list(zip(sorted_aum_sch["sub_category"], sorted_aum_sch["net_flow_cr"])),
+            ))
+            fig_top_aum.update_layout(
+                height=max(450, len(sorted_aum_sch) * 30),
+                **CHART_THEME, showlegend=False,
+                margin=dict(r=180, l=10),
+                xaxis=dict(title="AUM (₹ Cr)", **AXIS_STYLE),
+                yaxis=dict(tickfont=dict(size=10), **AXIS_STYLE),
+            )
+            st.plotly_chart(fig_top_aum, use_container_width=True)
+
+        # ── AUM Treemap (Category → Scheme) ───────────────────────
+        if sel_subcat == "All Scheme Types" and not df_amc_latest.empty:
+            st.markdown(
+                f"<div class='section-header'>AUM Treemap — "
+                f"{sel_amc} — {latest_month_lbl}</div>",
+                unsafe_allow_html=True,
+            )
+            st.caption("Size = AUM, Color = Net Flow %")
+
+            tree_df = df_amc_latest[df_amc_latest["aum_cur_cr"] > 0].copy()
+            if not tree_df.empty:
+                tree_df["flow_pct_tree"] = np.where(
+                    tree_df["aum_cur_cr"] > 0,
+                    (tree_df["net_flow_cr"] / tree_df["aum_cur_cr"] * 100).clip(-20, 20),
+                    0,
+                )
+                tree_df["short"] = tree_df["scheme_name"].apply(
+                    lambda s: s.split(" ", 2)[-1] if " " in s else s
+                )
+                fig_tree = px.treemap(
+                    tree_df, path=["sub_category", "short"],
+                    values="aum_cur_cr", color="flow_pct_tree",
+                    color_continuous_scale=["#dc2626", "#fef2f2", "#f0fdf4", "#16a34a"],
+                    color_continuous_midpoint=0,
+                    hover_data={"aum_cur_cr": ":,.0f", "net_flow_cr": ":,.0f"},
+                )
+                fig_tree.update_layout(
+                    height=520, **CHART_THEME,
+                    coloraxis_colorbar=dict(title="Flow %", ticksuffix="%"),
+                )
+                fig_tree.update_traces(
+                    hovertemplate=(
+                        "<b>%{label}</b><br>"
+                        "AUM: ₹%{value:,.0f} Cr<br>"
+                        "Flow %: %{color:+.1f}%<extra></extra>"
+                    ),
+                )
+                st.plotly_chart(fig_tree, use_container_width=True)
+
         # ── Top Schemes ───────────────────────────────────────────
         if not df_amc_latest.empty:
             col_l, col_r = st.columns(2)
