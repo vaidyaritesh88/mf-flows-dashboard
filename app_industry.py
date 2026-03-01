@@ -413,7 +413,7 @@ with k4:
                 unsafe_allow_html=True)
 with k5:
     cls = "kpi-pos" if flow_pct_latest >= 0 else "kpi-neg"
-    st.markdown(kpi("Flow / AUM", f"{flow_pct_latest:+.2f}%",
+    st.markdown(kpi("Flow / AUM", f"{flow_pct_latest:+.1f}%",
                      "latest month", cls),
                 unsafe_allow_html=True)
 
@@ -1023,7 +1023,7 @@ with tab3:
                         unsafe_allow_html=True)
         with ak4:
             cls = "kpi-pos" if amc_flow_pct >= 0 else "kpi-neg"
-            st.markdown(kpi("Flow/AUM", f"{amc_flow_pct:+.2f}%", "", cls),
+            st.markdown(kpi("Flow/AUM", f"{amc_flow_pct:+.1f}%", "", cls),
                         unsafe_allow_html=True)
 
         # ── AMC Flow Time-Series ──────────────────────────────────
@@ -1251,8 +1251,10 @@ with tab3:
             # ── Category AUM Summary Table ────────────────────────
             cat_summary = aum_by_cat.copy()
             cat_summary.columns = ["Category", "AUM (₹ Cr)", "Net Flow (₹ Cr)", "AUM Share %"]
-            cat_summary["AUM (₹ Cr)"] = cat_summary["AUM (₹ Cr)"].apply(lambda x: round(x, 0))
-            cat_summary["Net Flow (₹ Cr)"] = cat_summary["Net Flow (₹ Cr)"].apply(lambda x: round(x, 0))
+            cat_summary["AUM (₹ Cr)"] = cat_summary["AUM (₹ Cr)"].apply(
+                lambda x: f"{x:,.0f}" if pd.notna(x) else "—")
+            cat_summary["Net Flow (₹ Cr)"] = cat_summary["Net Flow (₹ Cr)"].apply(
+                lambda x: f"{x:,.0f}" if pd.notna(x) else "—")
             cat_summary["AUM Share %"] = cat_summary["AUM Share %"].apply(lambda x: f"{x:.1f}%")
             st.dataframe(cat_summary, use_container_width=True, hide_index=True)
 
@@ -1427,9 +1429,10 @@ with tab4:
         "AUM Cur (\u20b9Cr)", "AUM Prev (\u20b9Cr)", "Net Flow (\u20b9Cr)", "Flow %",
     ]
     for col in ["AUM Cur (\u20b9Cr)", "AUM Prev (\u20b9Cr)", "Net Flow (\u20b9Cr)"]:
-        show_df[col] = show_df[col].apply(lambda x: round(x, 0) if pd.notna(x) else None)
+        show_df[col] = show_df[col].apply(
+            lambda x: f"{x:,.0f}" if pd.notna(x) else "—")
     show_df["Flow %"] = show_df["Flow %"].apply(
-        lambda x: f"{x:+.2f}%" if pd.notna(x) else None
+        lambda x: f"{x:+.1f}%" if pd.notna(x) else "—"
     )
 
     st.dataframe(show_df, use_container_width=True, height=600)
