@@ -305,6 +305,66 @@ if df_all.empty:
     st.warning("No data matches filters.")
     st.stop()
 
+# ── Date Range Selector (sidebar) ────────────────────────────────────────────
+_all_months = sorted(df_all["month_end"].unique())
+_data_start, _data_end = _all_months[0], _all_months[-1]
+
+with st.sidebar:
+    st.markdown("### \U0001f4c5 Date Range")
+    range_opt = st.radio(
+        "Quick select",
+        ["1 Y", "2 Y", "3 Y", "5 Y", "All", "Custom"],
+        index=4,
+        horizontal=True,
+        label_visibility="collapsed",
+        key="date_range_opt",
+    )
+
+if range_opt == "Custom":
+    with st.sidebar:
+        _month_opts = sorted(df_all["month_end"].unique())
+        _month_disp = {m: pd.Timestamp(m).strftime("%b '%y") for m in _month_opts}
+        _col_s, _col_e = st.columns(2)
+        with _col_s:
+            range_start = st.selectbox(
+                "From", _month_opts,
+                format_func=lambda m: _month_disp[m],
+                key="range_start",
+            )
+        with _col_e:
+            range_end = st.selectbox(
+                "To", _month_opts[::-1],
+                format_func=lambda m: _month_disp[m],
+                key="range_end",
+            )
+        if pd.Timestamp(range_start) > pd.Timestamp(range_end):
+            st.warning("Start month must be before end month.")
+            range_start, range_end = range_end, range_start
+elif range_opt == "All":
+    range_start, range_end = _data_start, _data_end
+else:
+    _yrs = int(range_opt.split()[0])
+    range_end = _data_end
+    _cutoff = pd.Timestamp(_data_end) - pd.DateOffset(years=_yrs)
+    _valid = [m for m in _all_months if pd.Timestamp(m) >= _cutoff]
+    range_start = _valid[0] if _valid else _data_start
+
+# Apply date range filter
+df_all = df_all[
+    (df_all["month_end"] >= range_start)
+    & (df_all["month_end"] <= range_end)
+]
+with st.sidebar:
+    st.caption(
+        f"\U0001f4c6 {pd.Timestamp(range_start).strftime('%b %Y')} \u2014 "
+        f"{pd.Timestamp(range_end).strftime('%b %Y')}  "
+        f"({df_all['month_end'].nunique()} months)"
+    )
+
+if df_all.empty:
+    st.warning("No data in selected date range.")
+    st.stop()
+
 # ── Period Selector (sidebar) ────────────────────────────────────────────────
 with st.sidebar:
     st.markdown("### \U0001f4ca View Period")
