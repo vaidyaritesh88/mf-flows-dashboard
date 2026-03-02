@@ -14,6 +14,7 @@ Database: data/mf_flows_industry.db (separate from the ICICI-only DB)
 import os
 import re
 import sqlite3
+import calendar
 import logging
 import time
 import requests
@@ -307,6 +308,12 @@ def compute_flows_for_month(year: int, month: int):
     cur_date_iso = datetime.strptime(cur_date_str, "%d-%b-%Y").strftime("%Y-%m-%d")
     prev_date_iso = datetime.strptime(prev_date_str, "%d-%b-%Y").strftime("%Y-%m-%d")
 
+    # Normalise month_end to last calendar day of the month so that
+    # re-pulling the same month always overwrites previous data.
+    last_day = calendar.monthrange(year, month)[1]
+    month_end_normalised = f"{year}-{month:02d}-{last_day:02d}"
+    month_prefix = f"{year}-{month:02d}-"   # for DELETE safety net
+
     # Merge on scheme_name
     merged = df_cur.merge(
         df_prev[["scheme_name", "nav_regular", "daily_aum_cr"]],
@@ -318,7 +325,7 @@ def compute_flows_for_month(year: int, month: int):
     if merged.empty:
         msg = "No matching schemes between months"
         log.error(msg)
-        _log_run(cur_date_iso, 0, "FAILED", msg)
+        _log_run(month_end_normalised, 0, "FAILED", msg)
         return
 
     # Compute flows
@@ -340,11 +347,11 @@ def compute_flows_for_month(year: int, month: int):
 
     flow_df = flow_df.dropna(subset=["net_flow_cr"])
     flow_df = flow_df.drop_duplicates(subset=["amc", "scheme_name"], keep="first")
-    flow_df["month_end"] = cur_date_iso
+    flow_df["month_end"] = month_end_normalised
 
-    # Store
+    # Store — delete ALL rows for this month (catches old partial-date entries)
     con = sqlite3.connect(DB_PATH)
-    con.execute("DELETE FROM industry_flows WHERE month_end = ?", (cur_date_iso,))
+    con.execute("DELETE FROM industry_flows WHERE month_end LIKE ?", (month_prefix + "%",))
     con.commit()
     flow_df.to_sql("industry_flows", con, if_exists="append", index=False)
     con.commit()
@@ -354,13 +361,15 @@ def compute_flows_for_month(year: int, month: int):
     total_aum = flow_df["aum_cur_cr"].sum()
     n_amc = flow_df["amc"].nunique()
     log.info("=" * 60)
-    log.info("Stored %d flow records for %s", len(flow_df), cur_date_iso)
+    log.info("Stored %d flow records for %s (data from %s)",
+             len(flow_df), month_end_normalised, cur_date_iso)
     log.info("  AMCs:           %d", n_amc)
     log.info("  Total Net Flow: Rs %.0f Cr", total_flow)
     log.info("  Total AUM:      Rs %.0f Cr", total_aum)
     log.info("=" * 60)
 
-    _log_run(cur_date_iso, len(flow_df), "SUCCESS", f"{n_amc} AMCs, {len(flow_df)} schemes")
+    _log_run(month_end_normalised, len(flow_df), "SUCCESS",
+             f"{n_amc} AMCs, {len(flow_df)} schemes (data from {cur_date_iso})")
 
 
 def _log_run(month_end, count, status, message):
