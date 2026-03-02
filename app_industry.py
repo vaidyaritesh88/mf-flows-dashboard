@@ -281,6 +281,10 @@ with st.sidebar:
                                       default=["Equity", "Hybrid"])
 
     st.markdown("---")
+    if st.button("\U0001f504 Refresh Data", use_container_width=True,
+                 help="Clear cached data and reload from database"):
+        st.cache_data.clear()
+        st.rerun()
     st.caption(
         "**Data Source**: AMFI-CRISIL API (mfid=0 = all AMCs)\n\n"
         "**Formula**: Flow = AUM(t) \u2212 AUM(t\u22121) \u00d7 NAV(t)/NAV(t\u22121)"
