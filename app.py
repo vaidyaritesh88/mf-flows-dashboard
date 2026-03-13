@@ -243,6 +243,8 @@ with st.sidebar:
     st.markdown("### \U0001f50d Filters")
     category_filter = st.multiselect("Category", ["Equity", "Hybrid"],
                                       default=["Equity", "Hybrid"])
+    exclude_arb = st.checkbox("Exclude Arbitrage Flows", value=False,
+                              help="Remove Arbitrage scheme data from all calculations")
 
     st.markdown("---")
     st.caption(
@@ -272,6 +274,8 @@ if df.empty:
     st.stop()
 
 df = df[df["category"].isin(category_filter)]
+if exclude_arb:
+    df = df[df["sub_category"] != "Arbitrage"]
 if df.empty:
     st.warning("No data matches your filters.")
     st.stop()

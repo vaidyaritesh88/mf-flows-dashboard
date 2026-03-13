@@ -279,6 +279,8 @@ with st.sidebar:
     st.markdown("### \U0001f50d Filters")
     category_filter = st.multiselect("Category", ["Equity", "Hybrid"],
                                       default=["Equity", "Hybrid"])
+    exclude_arb = st.checkbox("Exclude Arbitrage Flows", value=False,
+                              help="Remove Arbitrage scheme data from all calculations")
 
     st.markdown("---")
     if st.button("\U0001f504 Refresh Data", use_container_width=True,
@@ -305,6 +307,8 @@ if df_all.empty:
     st.stop()
 
 df_all = df_all[df_all["category"].isin(category_filter)]
+if exclude_arb:
+    df_all = df_all[df_all["sub_category"] != "Arbitrage"]
 if df_all.empty:
     st.warning("No data matches filters.")
     st.stop()
