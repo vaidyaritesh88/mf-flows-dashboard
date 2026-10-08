@@ -118,7 +118,9 @@ def agg_by_period(df, period, extra_group=None):
     elif period == "Financial Year":
         df["_period"] = df["fy"]
     elif period == "FY YTD":
-        cfy = get_current_fy()
+        # Use the FY of the latest month in the (already period-filtered) data,
+        # not today's calendar FY, so the selected FY and stale data both work.
+        cfy = assign_fy(df["month_end"].max()) if not df.empty else get_current_fy()
         df = df[df["fy"] == cfy]
         df["_period"] = df["month_lbl"]
 
@@ -229,7 +231,13 @@ with st.sidebar:
     st.markdown("---")
 
     # Show fetch controls only when running locally (not on Streamlit Cloud)
-    _is_cloud = os.environ.get("STREAMLIT_SHARING") or os.environ.get("STREAMLIT_SERVER_HEADLESS")
+    # Streamlit Community Cloud mounts the repo under /mount/src and runs headless;
+    # the old STREAMLIT_SHARING env var is not set there, so check the path too.
+    _is_cloud = (
+        os.path.abspath(__file__).replace("\\", "/").startswith("/mount/src")
+        or os.environ.get("STREAMLIT_SHARING")
+        or os.environ.get("STREAMLIT_SERVER_HEADLESS")
+    )
     if not _is_cloud:
         st.markdown("### \U0001f4e5 Fetch Data")
         st.caption("Fetches ALL AMCs at once (system-level) via mfid=0.")

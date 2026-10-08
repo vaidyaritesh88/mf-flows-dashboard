@@ -1,0 +1,53 @@
+# Monthly refresh: pull the previous month from AMFI, rebuild the static dashboard,
+# commit data + docs back to the repo. Runs on the 12th (AMFI publishes ~10th).
+# Can also be triggered by hand from the Actions tab (workflow_dispatch),
+# optionally for a specific month.
+name: Refresh MF flows data
+
+on:
+  schedule:
+    - cron: "30 4 12 * *"        # 04:30 UTC = 10:00 IST on the 12th of every month
+  workflow_dispatch:
+    inputs:
+      year:
+        description: "Year (leave blank for previous month)"
+        required: false
+      month:
+        description: "Month 1-12 (leave blank for previous month)"
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - run: pip install requests pandas python-dateutil
+      - name: Refresh index levels
+        run: python fetch_index_levels.py || true
+      - name: Refresh AMC share prices
+        run: python fetch_amc_prices.py || true
+      - name: Pull month from AMFI
+        run: |
+          if [ -n "${{ github.event.inputs.year }}" ] && [ -n "${{ github.event.inputs.month }}" ]; then
+            python pipeline_multi.py --year "${{ github.event.inputs.year }}" --month "${{ github.event.inputs.month }}"
+          else
+            python pipeline_multi.py
+          fi
+      - name: Top up daily AUM (last two weeks)
+        run: python pipeline_daily.py || true
+      - name: Rebuild static dashboard
+        run: python build_dashboard.py
+      - name: Commit and push if changed
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git add data/mf_flows_industry.db data/index_levels.json data/amc_prices.json docs/index.html
+          git diff --cached --quiet && echo "No changes" && exit 0
+          git commit -m "Data refresh: $(date -u +'%d %b %Y')"
+          git push

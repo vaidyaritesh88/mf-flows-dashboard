@@ -46,6 +46,10 @@ API_HEADERS = {
 # mfid=0 means ALL AMCs
 SYSTEM_MFID = 0
 
+# Max deviation of a scheme's monthly NAV return from its sub-category median before it is
+# treated as a NAV series break (see compute_flows_for_month)
+NAV_BREAK_TOL = 0.25
+
 MATURITY_TYPE_OPEN = 1
 
 CATEGORIES = {
@@ -82,6 +86,7 @@ MONTH_ABBR = {
 # Known AMC prefixes → short names (for extracting AMC from scheme name)
 AMC_PREFIXES = [
     ("360 ONE ", "360 ONE"),
+    ("Abakkus ", "Abakkus"),
     ("Aditya Birla Sun Life ", "ABSL"),
     ("Angel One ", "Angel One"),
     ("Axis ", "Axis"),
@@ -95,6 +100,8 @@ AMC_PREFIXES = [
     ("DSP ", "DSP"),
     ("Edelweiss ", "Edelweiss"),
     ("Franklin India ", "Franklin"),
+    ("Franklin ", "Franklin"),          # e.g. Franklin Build India Fund
+    ("Templeton India ", "Franklin"),   # Templeton India Value Fund (Franklin Templeton)
     ("Groww ", "Groww"),
     ("HDFC ", "HDFC"),
     ("HSBC ", "HSBC"),
@@ -124,11 +131,46 @@ AMC_PREFIXES = [
     ("Tata ", "Tata"),
     ("Taurus ", "Taurus"),
     ("Trust ", "Trust"),
+    ("TRUSTMF ", "Trust"),
+    ("The Wealth Company ", "The Wealth Company"),
+    ("Unifi ", "Unifi"),
     ("Union ", "Union"),
     ("UTI ", "UTI"),
     ("WhiteOak Capital ", "WhiteOak"),
     ("Zerodha ", "Zerodha"),
 ]
+
+
+RETURN_FIELDS = {
+    "r1y": "return1YearRegular", "r3y": "return3YearRegular", "r5y": "return5YearRegular",
+    "d1y": "return1YearDirect",  "d3y": "return3YearDirect",  "d5y": "return5YearDirect",
+    "b1y": "return1YearBenchmark", "b3y": "return3YearBenchmark", "b5y": "return5YearBenchmark",
+}
+
+
+def _num(v):
+    try:
+        f = float(v)
+        return None if f != f else f
+    except (TypeError, ValueError):
+        return None
+
+
+def store_returns(df: pd.DataFrame, month_end_normalised: str):
+    """Write the trailing-return snapshot for one month-end (replaces any earlier rows for that month)."""
+    if df.empty:
+        return 0
+    cols = ["amc", "scheme_name", "category", "sub_category", "benchmark"] + list(RETURN_FIELDS)
+    out = df[cols].copy()
+    out["aum_cr"] = df["daily_aum_cr"]
+    out["month_end"] = month_end_normalised
+    out = out.drop_duplicates(subset=["amc", "scheme_name"], keep="first")
+    con = sqlite3.connect(DB_PATH)
+    con.execute("DELETE FROM scheme_returns WHERE month_end LIKE ?", (month_end_normalised[:8] + "%",))
+    out.to_sql("scheme_returns", con, if_exists="append", index=False)
+    con.commit()
+    con.close()
+    return len(out)
 
 
 def extract_amc(scheme_name: str) -> str:
@@ -161,6 +203,20 @@ def init_db():
             expected_aum_cr REAL,
             net_flow_cr     REAL,
             flow_pct        REAL,
+            PRIMARY KEY (amc, scheme_name, month_end)
+        );
+
+        CREATE TABLE IF NOT EXISTS scheme_returns (
+            amc             TEXT,
+            scheme_name     TEXT,
+            category        TEXT,
+            sub_category    TEXT,
+            month_end       TEXT,
+            aum_cr          REAL,
+            benchmark       TEXT,
+            r1y REAL, r3y REAL, r5y REAL,        -- regular plan trailing returns, % p.a. (AMFI-CRISIL)
+            d1y REAL, d3y REAL, d5y REAL,        -- direct plan
+            b1y REAL, b3y REAL, b5y REAL,        -- scheme's own benchmark (TRI)
             PRIMARY KEY (amc, scheme_name, month_end)
         );
 
@@ -234,14 +290,18 @@ def fetch_all_system(report_date: str) -> pd.DataFrame:
                 if not scheme or not nav or not aum:
                     continue
 
-                all_rows.append({
+                row = {
                     "amc": extract_amc(scheme),
                     "scheme_name": scheme,
                     "category": cat_name,
                     "sub_category": subcat_name,
                     "nav_regular": nav,
                     "daily_aum_cr": aum,
-                })
+                    "benchmark": rec.get("benchmark"),
+                }
+                for k, src in RETURN_FIELDS.items():
+                    row[k] = _num(rec.get(src))
+                all_rows.append(row)
 
             time.sleep(0.3)
 
@@ -251,8 +311,16 @@ def fetch_all_system(report_date: str) -> pd.DataFrame:
 
 
 def _try_fetch(year, month):
-    """Try to fetch data for last business day of month, retrying earlier dates."""
+    """Try to fetch data for last business day of month, retrying earlier dates.
+    For the current (unfinished) month, start from the latest weekday instead, so a month-to-date
+    snapshot can be pulled; it is stored under the month-end key and overwritten by the final run."""
     report_date = get_last_business_day(year, month)
+    if datetime.strptime(report_date, "%d-%b-%Y").date() > date.today():
+        d = date.today()
+        while d.weekday() >= 5:
+            d -= timedelta(days=1)
+        report_date = d.strftime(f"%d-{MONTH_ABBR[d.month]}-%Y")
+        log.info("  Month not complete: using latest weekday %s (month-to-date snapshot)", report_date)
     df = fetch_all_system(report_date)
 
     if df.empty:
@@ -314,6 +382,9 @@ def compute_flows_for_month(year: int, month: int):
     month_end_normalised = f"{year}-{month:02d}-{last_day:02d}"
     month_prefix = f"{year}-{month:02d}-"   # for DELETE safety net
 
+    n_ret = store_returns(df_cur, f"{year}-{month:02d}-{calendar.monthrange(year, month)[1]:02d}")
+    log.info("Stored trailing returns for %d schemes", n_ret)
+
     # Merge on scheme_name
     merged = df_cur.merge(
         df_prev[["scheme_name", "nav_regular", "daily_aum_cr"]],
@@ -330,6 +401,16 @@ def compute_flows_for_month(year: int, month: int):
 
     # Compute flows
     merged["nav_return"] = merged["nav_regular_cur"] / merged["nav_regular_prev"]
+    # Guard against NAV series breaks in the AMFI feed (the reported plan switches between months,
+    # e.g. growth vs IDCW), which would otherwise show up as huge fake flows: if a scheme's monthly
+    # NAV return sits more than NAV_BREAK_TOL away from its sub-category median, use the median.
+    med = merged.groupby("sub_category")["nav_return"].transform("median")
+    broken = (merged["nav_return"] - med).abs() > NAV_BREAK_TOL
+    if broken.any():
+        for _, r in merged[broken].iterrows():
+            log.warning("NAV break %s: %s ret %.2f vs category median %.2f -> using median",
+                        month_end_normalised, r["scheme_name"], r["nav_return"], med[_])
+        merged.loc[broken, "nav_return"] = med[broken]
     merged["expected_aum_cr"] = merged["daily_aum_cr_prev"] * merged["nav_return"]
     merged["net_flow_cr"] = merged["daily_aum_cr_cur"] - merged["expected_aum_cr"]
     merged["flow_pct"] = (merged["net_flow_cr"] / merged["daily_aum_cr_prev"]) * 100
@@ -414,7 +495,25 @@ if __name__ == "__main__":
     parser.add_argument("--year", type=int)
     parser.add_argument("--month", type=int)
     parser.add_argument("--backfill", type=int, default=0)
+    parser.add_argument("--returns-backfill", action="store_true",
+                        help="(Re)build scheme_returns for every month from Mar 2019 to the latest month in the DB")
     args = parser.parse_args()
+
+    if args.returns_backfill:
+        init_db()
+        con = sqlite3.connect(DB_PATH)
+        months = [r[0] for r in con.execute("SELECT DISTINCT month_end FROM industry_flows ORDER BY 1")]
+        done = {r[0] for r in con.execute("SELECT DISTINCT month_end FROM scheme_returns")}
+        con.close()
+        todo = [m for m in months if m not in done]
+        log.info("Returns backfill: %d months to fetch (%d already stored)", len(todo), len(done))
+        for m in todo:
+            y, mo = int(m[:4]), int(m[5:7])
+            df, used = _try_fetch(y, mo)
+            n = store_returns(df, m)
+            log.info("  %s: %d schemes (data from %s)", m, n, used)
+            time.sleep(1)
+        raise SystemExit(0)
 
     if args.year and args.month:
         target_year, target_month = args.year, args.month

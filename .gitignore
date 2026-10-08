@@ -14,3 +14,11 @@ __pycache__/
 # OS
 .DS_Store
 Thumbs.db
+.claude/
+
+# dated share copies of the dashboard (docs/index.html is the tracked one)
+/*_MF_AMC_dashboard.html
+/exhibits/
+
+# local virtualenv
+venv/

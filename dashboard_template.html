@@ -1,0 +1,1293 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>MF Industry Flows</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+:root{
+  color-scheme:light;
+  --page:#f9f9f7; --card:#fcfcfb; --text:#0b0b0b; --text2:#52514e; --muted:#898781;
+  --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,.10); --hover:#f0efec; --alt:#f4f4f1;
+  --s1:#2a78d6; --s2:#eb6834; --s3:#1baf7a; --s4:#eda100; --s5:#e87ba4; --s6:#008300; --s7:#4a3aa7; --s8:#e34948;
+  --pos:#2a78d6; --neg:#e34948; --good:#006300; --bad:#d03b3b; --other:#b5b3ab;
+  --seq1:#cde2fb; --seq2:#9ec5f4; --seq3:#6da7ec; --seq4:#3987e5; --seq5:#256abf; --seq6:#184f95;
+  --accent:#2a78d6;
+}
+:root[data-theme="dark"]{
+  color-scheme:dark;
+  --page:#0d0d0d; --card:#1a1a19; --text:#ffffff; --text2:#c3c2b7; --muted:#898781;
+  --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,.10); --hover:#262624; --alt:#212120;
+  --s1:#3987e5; --s2:#d95926; --s3:#199e70; --s4:#c98500; --s5:#d55181; --s6:#008300; --s7:#9085e9; --s8:#e66767;
+  --pos:#3987e5; --neg:#e66767; --good:#0ca30c; --bad:#e66767; --other:#5a5955;
+  --seq1:#104281; --seq2:#1c5cab; --seq3:#2a78d6; --seq4:#5598e7; --seq5:#86b6ef; --seq6:#b7d3f6;
+  --accent:#3987e5;
+}
+*{box-sizing:border-box}
+[hidden]{display:none!important}
+html,body{margin:0;background:var(--page);color:var(--text);
+  font:14px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{display:flex;align-items:center;gap:14px;padding:12px 22px;background:var(--card);border-bottom:1px solid var(--border);flex-wrap:wrap}
+h1{font-size:17px;margin:0;font-weight:650;letter-spacing:-.01em}
+.sub{color:var(--text2);font-size:12px}
+.spacer{flex:1}
+button,select,input[type=search]{font:inherit;color:var(--text);background:var(--card);border:1px solid var(--border);border-radius:7px;padding:6px 12px;cursor:pointer}
+button:hover{background:var(--hover)}
+button.on{background:var(--accent);border-color:var(--accent);color:#fff}
+select{cursor:pointer;min-width:120px}
+input[type=search]{cursor:text;min-width:220px}
+.bar{display:flex;align-items:center;gap:8px;padding:10px 22px;border-bottom:1px solid var(--border);background:var(--card);flex-wrap:wrap}
+.grp{display:flex;align-items:center;gap:4px;margin-right:12px}
+.lbl{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.06em;font-weight:600;margin-right:4px}
+.seg button{border-radius:0;margin-left:-1px;padding:5px 11px}
+.seg button:first-child{border-radius:7px 0 0 7px;margin-left:0}
+.seg button:last-child{border-radius:0 7px 7px 0}
+.seg{display:inline-flex}
+label.chk{display:inline-flex;align-items:center;gap:6px;color:var(--text2);font-size:13px;cursor:pointer}
+nav{display:flex;gap:2px;padding:8px 22px;border-bottom:1px solid var(--border);background:var(--card);overflow-x:auto}
+nav button{border:none;background:none;color:var(--text2);font-weight:500;padding:7px 15px;white-space:nowrap}
+nav button.on{background:var(--accent);color:#fff}
+main{padding:20px 22px 40px}
+.view{display:none}.view.on{display:block}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:12px;margin-bottom:18px}
+.kpi{background:var(--card);border:1px solid var(--border);border-radius:11px;padding:13px 16px}
+.kpi .k{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.05em;font-weight:600}
+.kpi .v{font-size:25px;font-weight:650;margin-top:4px;letter-spacing:-.02em}
+.kpi .s{font-size:11.5px;color:var(--text2);margin-top:2px}
+.up{color:var(--good)}.dn{color:var(--bad)}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(460px,1fr));gap:16px}
+.grid .wide{grid-column:1/-1}
+.card{background:var(--card);border:1px solid var(--border);border-radius:11px;padding:15px 16px 12px;min-width:0}
+.card .hd{display:flex;align-items:flex-start;gap:8px;margin-bottom:8px}
+.card h3{margin:0;font-size:14px;font-weight:600}
+.card .cap{color:var(--muted);font-size:11.5px;margin-top:1px}
+.card .tbtn{margin-left:auto;font-size:11px;padding:3px 9px;color:var(--text2)}
+.wrap{position:relative;height:280px}
+.wrap.tall{height:420px}
+.wrap.short{height:170px}
+.tv{display:none;overflow:auto;max-height:420px}
+.chip{border-radius:999px;padding:4px 12px;font-size:12.5px;border:1.5px solid var(--border);background:var(--card)}
+.chip .x{margin-left:7px;color:var(--muted)}
+.fin-co{margin:0 0 22px}
+.fin-name{font-size:15px;font-weight:700;margin:14px 0 4px;padding-bottom:4px;border-bottom:2px solid var(--border)}
+.fin-tag{font-size:10px;font-weight:600;color:var(--muted);border:1px solid var(--border);border-radius:4px;padding:1px 6px;margin-left:8px;vertical-align:middle}
+.fin-src{color:var(--muted);font-size:11.5px;margin:0 0 8px;max-width:1100px}
+.fin-scroll{overflow-x:auto;border:1px solid var(--border);border-radius:10px;background:var(--card)}
+.fin-tbl{border-collapse:separate;border-spacing:0;font-size:12px;font-variant-numeric:tabular-nums;white-space:nowrap;table-layout:fixed}
+.fin-tbl th{color:var(--text2);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em;text-align:right;padding:6px 9px;border-bottom:1px solid var(--border);position:sticky;top:0;background:var(--card);z-index:2}
+.fin-tbl th:first-child{text-align:left;position:sticky;left:0;z-index:3;text-transform:none;letter-spacing:0;font-size:12px}
+.fin-tbl td{text-align:right;padding:4px 9px;border-bottom:1px solid var(--grid);overflow:hidden;text-overflow:ellipsis}
+.fin-tbl td:first-child{text-align:left;position:sticky;left:0;background:var(--card);z-index:1;white-space:nowrap}
+.fin-tbl tr.sec td{color:var(--text2);font-size:10.5px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;background:var(--alt);padding:6px 9px;border-top:2px solid var(--border);text-align:left}
+.fin-tbl tr.tot td{font-weight:700;border-top:1px solid var(--border);background:var(--alt)}
+.fin-tbl.growth td:first-child{white-space:normal;line-height:1.25}
+.fin-tbl td.ind1{padding-left:26px;color:var(--text2)}
+.fin-tbl td.ind2{padding-left:42px;color:var(--text2)}
+.fin-tbl td.fc,.fin-tbl th.fc{background:rgba(237,161,0,.10);font-style:italic}
+.fin-tbl td.neg{color:var(--bad)}.fin-tbl td.pos{color:var(--good)}
+.fin-tbl tbody tr:hover td{background:var(--hover)}
+#amcSeries .fin-scroll{max-height:none}
+.card.table .wrap{display:none}.card.table .tv{display:block}
+table{width:100%;border-collapse:collapse;font-size:12.5px;font-variant-numeric:tabular-nums}
+th,td{padding:6px 10px;text-align:right;border-bottom:1px solid var(--grid);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+thead th{color:var(--text2);font-weight:600;font-size:11px;text-transform:uppercase;letter-spacing:.04em;position:sticky;top:0;background:var(--card);z-index:2}
+tbody tr:hover td{background:var(--hover)}
+td.p{color:var(--good)}td.n{color:var(--bad)}
+.heat{overflow:auto;max-height:560px}
+.heat table{font-size:11.5px}
+.heat td{padding:4px 7px;border:2px solid var(--card);border-radius:3px;text-align:center;min-width:56px}
+.heat td:first-child{text-align:left;position:sticky;left:0;background:var(--card);border:none;font-weight:500;z-index:1;max-width:220px;overflow:hidden;text-overflow:ellipsis}
+.heat thead th{position:sticky;top:0;background:var(--card);z-index:2;font-size:10.5px;text-align:center}
+.heat thead th:first-child{left:0;z-index:3}
+.note{color:var(--text2);font-size:12px;margin:0 0 14px}
+.legend-ink{color:var(--text2);font-size:11.5px}
+.tools{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:12px}
+.scroll{overflow:auto;max-height:72vh;border:1px solid var(--border);border-radius:11px;background:var(--card)}
+.scroll thead th{background:var(--card)}
+th.sortable{cursor:pointer}
+th.sortable:hover{color:var(--accent)}
+@media (max-width:640px){.grid{grid-template-columns:1fr}.wrap{height:240px}main{padding:14px}}
+</style>
+</head>
+<body data-palette="#2a78d6,#eb6834,#1baf7a,#eda100,#e87ba4,#008300,#4a3aa7,#e34948">
+<header>
+  <div>
+    <h1>Mutual Fund Industry — Flow Dashboard</h1>
+    <div class="sub" id="subtitle"></div>
+  </div>
+  <div class="spacer"></div>
+  <span class="sub" id="built"></span>
+  <button id="themeBtn" title="Toggle light / dark">🌙 Dark</button>
+</header>
+
+<div class="bar" id="filters">
+  <div class="grp" id="grpPeriod"><span class="lbl">Period</span>
+    <span class="seg" id="periodSeg">
+      <button data-v="M" class="on">Monthly</button><button data-v="Q">Quarterly</button><button data-v="FY">Fin. Year</button><button data-v="YTD">FY YTD</button>
+    </span></div>
+  <div class="grp" id="grpAsOf"><span class="lbl">As of</span><select id="asOf"></select></div>
+  <div class="grp" id="grpRange"><span class="lbl">Range</span>
+    <span class="seg" id="rangeSeg">
+      <button data-v="1">1Y</button><button data-v="2">2Y</button><button data-v="3" class="on">3Y</button><button data-v="5">5Y</button><button data-v="0">All</button>
+    </span></div>
+  <div class="grp"><span class="lbl">Category</span>
+    <span class="seg" id="catSeg">
+      <button data-v="All" class="on">All</button><button data-v="Equity">Equity</button><button data-v="Hybrid">Hybrid</button>
+    </span></div>
+  <label class="chk"><input type="checkbox" id="exArb"> Exclude arbitrage</label>
+</div>
+
+<nav id="nav">
+  <button data-v="overview" class="on">Overview</button>
+  <button data-v="cats">Categories</button>
+  <button data-v="amcs">AMCs</button>
+  <button data-v="dd">AMC Deep-Dive</button>
+  <button data-v="data">Data</button>
+  <button data-v="bridge">AUM bridge</button>
+  <button data-v="qaum">Quarterly AUM</button>
+  <button data-v="perf">Performance</button>
+  <button data-v="amc">Listed AMCs</button>
+  <button data-v="val">Valuation</button>
+</nav>
+
+<main>
+  <div class="kpis" id="kpis"></div>
+
+  <section class="view on" id="v-overview">
+    <div class="grid">
+      <div class="card wide"><div class="hd"><div><h3>Net inflows / outflows</h3><div class="cap" id="cap_flow"></div></div><button class="tbtn">Table</button></div><div class="wrap"><canvas id="c_flow"></canvas></div><div class="tv"></div></div>
+      <div class="card wide"><div class="hd"><div><h3>Net flow as % of opening AUM</h3><div class="cap">Same periods as above — the flow chart normalised for industry size</div></div><button class="tbtn">Table</button></div><div class="wrap short"><canvas id="c_flowpct"></canvas></div><div class="tv"></div></div>
+      <div class="card"><div class="hd"><div><h3>Rolling 12-month net inflows</h3><div class="cap" id="cap_ovTtm"></div></div><button class="tbtn">Table</button></div><div class="wrap"><canvas id="c_ovTtm"></canvas></div><div class="tv"></div></div>
+      <div class="card"><div class="hd"><div><h3>Rolling 12-month inflow intensity</h3><div class="cap" id="cap_ovTtmPct"></div></div><button class="tbtn">Table</button></div><div class="wrap"><canvas id="c_ovTtmPct"></canvas></div><div class="tv"></div></div>
+      <div class="card wide"><div class="hd"><div><h3>Growth and flow ratios by period</h3><div class="cap" id="cap_ovGrowth"></div></div></div><div id="ovGrowth"></div></div>
+      <div class="card"><div class="hd"><div><h3>Industry AUM</h3><div class="cap">Closing AUM, ₹ Cr, at the end of each period</div></div><button class="tbtn">Table</button></div><div class="wrap"><canvas id="c_aum"></canvas></div><div class="tv"></div></div>
+      <div class="card"><div class="hd"><div><h3>AUM growth, year on year</h3><div class="cap">% change vs the same period a year earlier</div></div><button class="tbtn">Table</button></div><div class="wrap"><canvas id="c_yoy"></canvas></div><div class="tv"></div></div>
+      <div class="card wide"><div class="hd"><div><h3>Net flow by category</h3><div class="cap">Top seven categories by AUM keep their own colour; the rest are folded into Other</div></div><button class="tbtn">Table</button></div><div class="wrap tall"><canvas id="c_catstack"></canvas></div><div class="tv"></div></div>
+    </div>
+  </section>
+
+  <section class="view" id="v-cats">
+    <div class="grid">
+      <div class="card"><div class="hd"><div><h3>Category AUM &amp; market share</h3><div class="cap" id="cap_cataum"></div></div><button class="tbtn">Table</button></div><div class="wrap tall"><canvas id="c_cataum"></canvas></div><div class="tv"></div></div>
+      <div class="card"><div class="hd"><div><h3>Category net flow</h3><div class="cap" id="cap_catflow"></div></div><button class="tbtn">Table</button></div><div class="wrap tall"><canvas id="c_catflow"></canvas></div><div class="tv"></div></div>
+      <div class="card wide"><div class="hd"><div><h3>Flow heatmap — category × period</h3><div class="cap">₹ Cr net flow. Blue = inflow, red = outflow, shade = size relative to the largest cell shown</div></div></div><div class="heat" id="heat"></div></div>
+      <div class="card wide"><div class="hd"><div><h3>AUM mix over time</h3><div class="cap">Share of industry AUM by category (%, top seven + Other)</div></div><button class="tbtn">Table</button></div><div class="wrap tall"><canvas id="c_catmix"></canvas></div><div class="tv"></div></div>
+    </div>
+  </section>
+
+  <section class="view" id="v-amcs">
+    <div class="grid">
+      <div class="card"><div class="hd"><div><h3>AMC net inflow ranking</h3><div class="cap" id="cap_amcflow"></div></div><button class="tbtn">Table</button></div><div class="wrap tall"><canvas id="c_amcflow"></canvas></div><div class="tv"></div></div>
+      <div class="card"><div class="hd"><div><h3>AMC AUM ranking</h3><div class="cap" id="cap_amcaum"></div></div><button class="tbtn">Table</button></div><div class="wrap tall"><canvas id="c_amcaum"></canvas></div><div class="tv"></div></div>
+      <div class="card wide"><div class="hd"><div><h3>Inflow share vs AUM share</h3><div class="cap" id="cap_scatter"></div></div><button class="tbtn">Table</button></div><div class="wrap tall"><canvas id="c_scatter"></canvas></div><div class="tv"></div></div>
+      <div class="card"><div class="hd"><div><h3>AUM market share trend</h3><div class="cap">Top eight AMCs by current AUM, % of industry AUM</div></div><button class="tbtn">Table</button></div><div class="wrap tall"><canvas id="c_sharetrend"></canvas></div><div class="tv"></div></div>
+      <div class="card"><div class="hd"><div><h3>Net inflow share trend</h3><div class="cap">Same eight AMCs, % of industry net inflow per period (periods with net outflow are blank)</div></div><button class="tbtn">Table</button></div><div class="wrap tall"><canvas id="c_inflowtrend"></canvas></div><div class="tv"></div></div>
+      <div class="card wide"><div class="hd"><div><h3>Rolling 12-month net inflow share</h3><div class="cap">Same eight AMCs, share of industry net inflow over the 12 months to each period-end \u2014 the smoothed version of the chart above</div></div><button class="tbtn">Table</button></div><div class="wrap tall"><canvas id="c_inflowttm"></canvas></div><div class="tv"></div></div>
+    </div>
+  </section>
+
+  <section class="view" id="v-dd">
+    <div class="tools">
+      <span class="lbl">AMC</span><select id="ddAmc"></select>
+      <span class="lbl">Scheme type</span><select id="ddType"></select>
+    </div>
+    <div class="grid">
+      <div class="card"><div class="hd"><div><h3>Net flow</h3><div class="cap" id="cap_ddflow"></div></div><button class="tbtn">Table</button></div><div class="wrap"><canvas id="c_ddflow"></canvas></div><div class="tv"></div></div>
+      <div class="card"><div class="hd"><div><h3>AUM</h3><div class="cap" id="cap_ddaum"></div></div><button class="tbtn">Table</button></div><div class="wrap"><canvas id="c_ddaum"></canvas></div><div class="tv"></div></div>
+      <div class="card wide"><div class="hd"><div><h3>Growth and flow ratios by period</h3><div class="cap" id="cap_ddGrowth"></div></div></div><div id="ddGrowth"></div></div>
+      <div class="card wide"><div class="hd"><div><h3>Inflow as % of opening AUM</h3><div class="cap" id="cap_ddpct"></div></div><button class="tbtn">Table</button></div><div class="wrap short"><canvas id="c_ddpct"></canvas></div><div class="tv"></div></div>
+      <div class="card"><div class="hd"><div><h3>Rolling 12-month net inflows</h3><div class="cap" id="cap_ddTtm"></div></div><button class="tbtn">Table</button></div><div class="wrap"><canvas id="c_ddTtm"></canvas></div><div class="tv"></div></div>
+      <div class="card"><div class="hd"><div><h3>Rolling 12-month inflow intensity</h3><div class="cap" id="cap_ddTtmPct"></div></div><button class="tbtn">Table</button></div><div class="wrap"><canvas id="c_ddTtmPct"></canvas></div><div class="tv"></div></div>
+      <div class="card"><div class="hd"><div><h3>Net flow by category</h3><div class="cap" id="cap_ddcat"></div></div><button class="tbtn">Table</button></div><div class="wrap tall"><canvas id="c_ddcat"></canvas></div><div class="tv"></div></div>
+      <div class="card"><div class="hd"><div><h3>Largest schemes by AUM</h3><div class="cap" id="cap_ddtop"></div></div><button class="tbtn">Table</button></div><div class="wrap tall"><canvas id="c_ddtop"></canvas></div><div class="tv"></div></div>
+      <div class="card wide"><div class="hd"><div><h3>AUM concentration by scheme over time</h3><div class="cap" id="cap_ddconc"></div></div><button class="tbtn">Table</button></div><div class="wrap tall"><canvas id="c_ddconc"></canvas></div><div class="tv"></div></div>
+      <div class="card"><div class="hd"><div><h3>Top inflow schemes</h3><div class="cap" id="cap_ddin"></div></div><button class="tbtn">Table</button></div><div class="wrap tall"><canvas id="c_ddin"></canvas></div><div class="tv"></div></div>
+      <div class="card"><div class="hd"><div><h3>Top outflow schemes</h3><div class="cap" id="cap_ddout"></div></div><button class="tbtn">Table</button></div><div class="wrap tall"><canvas id="c_ddout"></canvas></div><div class="tv"></div></div>
+    </div>
+  </section>
+
+  <section class="view" id="v-data">
+    <div class="tools">
+      <input type="search" id="q" placeholder="Search scheme / AMC / category…">
+      <span class="sub" id="dataCount"></span>
+      <span class="spacer"></span>
+      <button id="csvBtn">Download CSV</button>
+    </div>
+    <div class="scroll"><table id="dataTbl"><thead></thead><tbody></tbody></table></div>
+    <div class="card wide" style="margin-top:18px"><div class="hd"><div><h3>Period time series</h3><div class="cap" id="cap_ts"></div></div>
+      <span class="lbl" style="margin-left:auto;align-self:center">Entity</span><select id="tsEnt" style="align-self:center"></select>
+      <button id="tsCsv" style="align-self:center;margin-left:8px">Download CSV</button></div>
+      <div class="fin-scroll" id="tsTbl"></div></div>
+  </section>
+
+  <section class="view" id="v-bridge">
+    <div class="tools">
+      <span class="lbl">AMCs</span><span id="brChips" style="display:inline-flex;gap:6px;flex-wrap:wrap"></span>
+      <select id="brAdd"></select>
+      <span class="lbl" style="margin-left:14px">From</span><select id="brS"></select>
+      <span class="lbl">To</span><select id="brE"></select>
+    </div>
+    <p class="note" id="brNote"></p>
+    <div class="grid">
+      <div class="card wide"><div class="hd"><div><h3>AUM bridge</h3><div class="cap" id="cap_brTbl"></div></div></div><div class="fin-scroll" id="brTbl"></div></div>
+      <div class="card"><div class="hd"><div><h3>Composition of AUM growth</h3><div class="cap">Each component as % of opening AUM; the three add up to the growth rate. Hover for each component's share of the growth</div></div><button class="tbtn">Table</button></div><div class="wrap tall"><canvas id="c_brComp"></canvas></div><div class="tv"></div></div>
+      <div class="card"><div class="hd"><div><h3>NAV return vs market indices</h3><div class="cap">AUM-weighted NAV return chained monthly, rebased to 100 at the start month; dashed lines are index price returns</div></div><button class="tbtn">Table</button></div><div class="wrap tall"><canvas id="c_brNav"></canvas></div><div class="tv"></div></div>
+      <div class="card wide"><div class="hd"><div><h3>Monthly bridge — <span id="brMonName"></span></h3><div class="cap">Net inflows and mark-to-market by month, ₹ Cr</div></div><select id="brMon" style="margin-left:auto;align-self:center"></select></div><div class="wrap"><canvas id="c_brMonthly"></canvas></div><div class="tv"></div></div>
+    </div>
+  </section>
+  <section class="view" id="v-qaum">
+    <div class="tools">
+      <span class="lbl">Quarter</span><select id="qaQ"></select>
+      <span class="lbl" style="margin-left:14px">Chart entity</span><select id="qaEnt"></select>
+    </div>
+    <p class="note" id="qaNote"></p>
+    <div class="grid">
+      <div class="card wide"><div class="hd"><div><h3>Quarterly average AUM (daily basis)</h3><div class="cap" id="cap_qaTbl"></div></div></div><div class="fin-scroll" id="qaTbl"></div></div>
+      <div class="card wide"><div class="hd"><div><h3>Daily AUM and quarter averages</h3><div class="cap" id="cap_qaChart"></div></div><button class="tbtn">Table</button></div><div class="wrap tall"><canvas id="c_qaChart"></canvas></div><div class="tv"></div></div>
+    </div>
+  </section>
+  <section class="view" id="v-perf">
+    <div class="tools">
+      <span class="lbl">Horizon</span>
+      <span class="seg" id="pfHor"><button data-v="1">1 year</button><button data-v="3" class="on">3 years</button><button data-v="5">5 years</button></span>
+      <span class="lbl" style="margin-left:14px">AMC</span><select id="pfAmc"></select>
+      <span class="lbl" style="margin-left:14px">Category</span><select id="pfCat"></select>
+      <span class="sub" style="margin-left:10px">Peer group = AMFI sub-category, regular-plan growth returns; quartiles need at least 8 schemes</span>
+    </div>
+    <p class="note" id="pfNote"></p>
+    <div class="grid">
+      <div class="card wide"><div class="hd"><div><h3>AUM by performance quartile — <span id="pfAmcName"></span></h3><div class="cap" id="cap_pfMix"></div></div><button class="tbtn">Table</button></div><div class="wrap tall"><canvas id="c_pfMix"></canvas></div><div class="tv"></div></div>
+      <div class="card"><div class="hd"><div><h3>Share of AUM in the top two quartiles</h3><div class="cap" id="cap_pfTop"></div></div><button class="tbtn">Table</button></div><div class="wrap"><canvas id="c_pfTop"></canvas></div><div class="tv"></div></div>
+      <div class="card"><div class="hd"><div><h3>Share of AUM beating its benchmark</h3><div class="cap" id="cap_pfBeat"></div></div><button class="tbtn">Table</button></div><div class="wrap"><canvas id="c_pfBeat"></canvas></div><div class="tv"></div></div>
+      <div class="card"><div class="hd"><div><h3>AUM-weighted alpha vs benchmark</h3><div class="cap" id="cap_pfAlpha"></div></div><button class="tbtn">Table</button></div><div class="wrap"><canvas id="c_pfAlpha"></canvas></div><div class="tv"></div></div>
+      <div class="card wide"><div class="hd"><div><h3>AMC scorecard</h3><div class="cap" id="cap_pfScore"></div></div></div><div class="fin-scroll" id="pfScore"></div></div>
+      <div class="card wide"><div class="hd"><div><h3>Top-half share heatmap — AMC × period</h3><div class="cap" id="cap_pfHeat"></div></div></div><div class="heat" id="pfHeat"></div></div>
+      <div class="card wide"><div class="hd"><div><h3>Schemes — <span id="pfAmcName2"></span></h3><div class="cap" id="cap_pfSch"></div></div></div><div class="fin-scroll" id="pfSch"></div></div>
+      <div class="card wide"><div class="hd"><div><h3>Category peers — <span id="pfCatName"></span></h3><div class="cap" id="cap_pfCat"></div></div></div><div class="fin-scroll" id="pfCatTbl"></div></div>
+      <div class="card wide"><div class="hd"><div><h3>Category AUM by performance quartile — <span id="pfCatName2"></span></h3><div class="cap" id="cap_pfCatMix"></div></div><button class="tbtn">Table</button></div><div class="wrap tall"><canvas id="c_pfCatMix"></canvas></div><div class="tv"></div></div>
+    </div>
+  </section>
+  <section class="view" id="v-amc">
+    <div class="bar" id="amcBar" style="padding:10px 0;border:none;background:none;margin-bottom:4px">
+      <div class="grp"><span class="lbl">Frequency</span>
+        <span class="seg" id="amcFreq"><button data-v="Q" class="on">Quarterly</button><button data-v="A">Annual</button></span></div>
+      <div class="grp"><span class="lbl">Show P&amp;L as</span>
+        <span class="seg" id="amcView"><button data-v="mn" class="on">₹ mn</button><button data-v="bps">bps of AAUM</button></span></div>
+      <div class="grp"><span class="lbl">AAUM base</span>
+        <span class="seg" id="amcBase"><button data-v="aum">Total</button><button data-v="aum_x" class="on">Total ex EPFO-type</button><button data-v="aum_mf">MF only</button></span></div>
+      <label class="chk" id="amcFcWrap"><input type="checkbox" id="amcFc"> Show ICICI Pru forecast (FY27E–FY31E, Janchor model)</label>
+    </div>
+    <p class="note" id="amcNote"></p>
+    <div id="amcSeries"></div>
+    <div class="grid" style="margin-top:8px">
+      <div class="card wide"><div class="hd"><div><h3>Cross-company comparison — one period</h3><div class="cap" id="cap_amcCmp"></div></div><span class="lbl" style="margin-left:auto;align-self:center">Period</span><select id="amcPeriod" style="align-self:center"></select></div><div class="fin-scroll" id="amcCmp"></div></div>
+      <div class="card"><div class="hd"><div><h3>Gross revenue yield</h3><div class="cap" id="cap_amcYield"></div></div><button class="tbtn">Table</button></div><div class="wrap"><canvas id="c_amcYield"></canvas></div><div class="tv"></div></div>
+      <div class="card"><div class="hd"><div><h3>Operating cost / AAUM</h3><div class="cap"></div></div><button class="tbtn">Table</button></div><div class="wrap"><canvas id="c_amcCost"></canvas></div><div class="tv"></div></div>
+      <div class="card"><div class="hd"><div><h3>PBT excl. other income / AAUM</h3><div class="cap"></div></div><button class="tbtn">Table</button></div><div class="wrap"><canvas id="c_amcPbt"></canvas></div><div class="tv"></div></div>
+      <div class="card"><div class="hd"><div><h3>AAUM growth, year on year</h3><div class="cap" id="cap_amcGrowth"></div></div><button class="tbtn">Table</button></div><div class="wrap"><canvas id="c_amcGrowth"></canvas></div><div class="tv"></div></div>
+      <div class="card"><div class="hd"><div><h3>AAUM: mutual fund, fee-earning alternates, EPFO-type</h3><div class="cap" id="cap_amcSplit"></div></div><button class="tbtn">Table</button></div><div class="wrap"><canvas id="c_amcSplit"></canvas></div><div class="tv"></div></div>
+      <div class="card"><div class="hd"><div><h3>MF AAUM mix</h3><div class="cap" id="cap_amcMix"></div></div><button class="tbtn">Table</button></div><div class="wrap"><canvas id="c_amcMix"></canvas></div><div class="tv"></div></div>
+      <div class="card"><div class="hd"><div><h3>AAUM mix: mutual fund vs PMS / AIF / advisory</h3><div class="cap" id="cap_amcAltMix"></div></div><button class="tbtn">Table</button></div><div class="wrap"><canvas id="c_amcAltMix"></canvas></div><div class="tv"></div></div>
+      <div class="card"><div class="hd"><div><h3>Fee-earning alternates as % of AAUM over time</h3><div class="cap" id="cap_amcAltTrend"></div></div><button class="tbtn">Table</button></div><div class="wrap"><canvas id="c_amcAltTrend"></canvas></div><div class="tv"></div></div>
+      <div class="card wide"><div class="hd"><div><h3>Equity-oriented share of MF AAUM</h3><div class="cap">% of MF AAUM in equity-oriented schemes (definitions differ slightly by company, see the note under each company block)</div></div><button class="tbtn">Table</button></div><div class="wrap"><canvas id="c_amcEq"></canvas></div><div class="tv"></div></div>
+    </div>
+  </section>
+  <section class="view" id="v-val">
+    <div class="tools">
+      <span class="lbl">FY27E PAT</span><span class="sub">edit the growth % in the table for HDFC, Nippon and SBI (default 14% over FY26); ICICI Pru AMC uses the Janchor model's FY27E PAT</span>
+    </div>
+    <p class="note" id="vlNote"></p>
+    <div class="grid">
+      <div class="card wide"><div class="hd"><div><h3>Valuation snapshot</h3><div class="cap" id="cap_vlTbl"></div></div></div><div class="fin-scroll" id="vlTbl"></div></div>
+      <div class="card wide"><div class="hd"><div><h3>Trailing 12-month P/E</h3><div class="cap" id="cap_vlPe"></div></div><button class="tbtn">Table</button></div><div class="wrap tall"><canvas id="c_vlPe"></canvas></div><div class="tv"></div></div>
+    </div>
+  </section>
+</main>
+
+<script>
+const D = /*__DATA__*/null;
+const S = D.schemes, R = D.rows, M = D.months, A = D.amcs, C = D.cats, NM = M.length;
+const MON = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+const MM = M.map(m => {
+  const y = +m.slice(0,4), mo = +m.slice(5,7), fy = mo >= 4 ? y + 1 : y;
+  const q = mo >= 4 && mo <= 6 ? 1 : mo >= 7 && mo <= 9 ? 2 : mo >= 10 ? 3 : 4;
+  return { y, mo, fy, q, lbl: MON[mo-1] + " '" + String(y % 100).padStart(2,"0"),
+           full: MON[mo-1] + " " + y, qlbl: "Q" + q + " FY" + String(fy % 100).padStart(2,"0"),
+           fylbl: "FY" + String(fy % 100).padStart(2,"0") };
+});
+const ARB = C.findIndex(c => c.n === "Arbitrage");
+// latest month may be a month-to-date snapshot (pipeline ran before the month-end): mark its labels
+if (D.provisional && D.lastDataDate){ const dd = D.lastDataDate.slice(8) + " " + MON[+D.lastDataDate.slice(5, 7) - 1]; MM[NM-1].lbl += "*"; MM[NM-1].full += " (provisional, to " + dd + ")"; }
+
+// ── state ──────────────────────────────────────────────────────────────────
+const st = { period: "M", asOf: NM - 1, range: 3, cat: "All", exArb: false, tab: "overview",
+             amc: 0, type: "All" };
+const LS = { get(k){ try { return localStorage.getItem(k); } catch(e){ return null; } },
+             set(k,v){ try { localStorage.setItem(k,v); } catch(e){} } };
+
+// ── theme ──────────────────────────────────────────────────────────────────
+function applyTheme(t){
+  document.documentElement.setAttribute("data-theme", t);
+  document.getElementById("themeBtn").textContent = t === "dark" ? "☀️ Light" : "🌙 Dark";
+  LS.set("mf_theme", t);
+}
+applyTheme(LS.get("mf_theme") === "dark" ? "dark" : "light");
+document.getElementById("themeBtn").onclick = () => {
+  applyTheme(document.documentElement.getAttribute("data-theme") === "dark" ? "light" : "dark");
+  renderAll();
+};
+const cssv = n => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
+const SLOTS = () => [1,2,3,4,5,6,7,8].map(i => cssv("--s" + i));
+
+// ── formatting ─────────────────────────────────────────────────────────────
+function fmtCr(v, sign){
+  if (v == null || isNaN(v)) return "—";
+  const s = sign && v > 0 ? "+" : "", a = Math.abs(v), neg = v < 0 ? "−" : "";
+  if (a >= 1e5) return s + neg + "₹" + (a/1e5).toFixed(1) + "L Cr";
+  if (a >= 1e3) return s + neg + "₹" + (a/1e3).toFixed(1) + "K Cr";
+  return s + neg + "₹" + Math.round(a).toLocaleString("en-IN") + " Cr";
+}
+const fmtPct = (v, d=1) => v == null || isNaN(v) ? "—" : (v > 0 ? "+" : "") + v.toFixed(d) + "%";
+const fmtNum = v => v == null || isNaN(v) ? "—" : Math.round(v).toLocaleString("en-IN");
+const axisCr = v => Math.abs(v) >= 1e5 ? (v/1e5).toFixed(1).replace(/\.0$/,"") + "L" : Math.abs(v) >= 1e3 ? (v/1e3).toFixed(0) + "K" : String(v);
+
+// ── data slicing ───────────────────────────────────────────────────────────
+function schemeOK(si){
+  const c = C[S[si][2]];
+  if (st.exArb && S[si][2] === ARB) return false;
+  return st.cat === "All" || c.g === st.cat;
+}
+let ROWS = [];                 // filtered rows
+let byMonth = [];              // [{flow, aum, open}] per month
+function rebuildBase(){
+  ROWS = R.filter(r => schemeOK(r[0]));
+  byMonth = monthAgg(ROWS);
+}
+function monthAgg(rows){
+  const a = Array.from({length: NM}, () => ({ flow: 0, aum: 0, open: 0, mtm: 0 }));
+  for (const r of rows){ const b = a[r[1]]; b.flow += r[2]; b.aum += r[3]; b.open += r[4]; b.mtm += r[4] * (r[5] - 1); }
+  return a;
+}
+// rolling 12-month net inflow ending at month index m (null until 12 months of data exist)
+function ttm(agg, m){ if (m < 11) return null; let x = 0; for (let i = m - 11; i <= m; i++) x += agg[i].flow; return x; }
+function ttmPct(agg, m){ const t = ttm(agg, m); return t == null || m < 12 || !agg[m - 12].aum ? null : t / agg[m - 12].aum * 100; }
+// YoY AUM growth split: inflow / mark-to-market / NFOs & scheme changes over the 12 months to m, each as % of AUM 12 months earlier
+function yoySplit(agg, m){ if (m < 12 || !agg[m - 12].aum) return { f: null, mtm: null, o: null }; const base = agg[m - 12].aum; let f = 0, x = 0; for (let i = m - 11; i <= m; i++){ f += agg[i].flow; x += agg[i].mtm; } return { f: f / base * 100, mtm: x / base * 100, o: (agg[m].aum - base - f - x) / base * 100 }; }
+// rolling-12M chart pair (bars in ₹ Cr, companion line in % of AUM 12 months earlier)
+function ttmCharts(idBar, idPct, agg, ps, capBar, capPct){
+  const labels = ps.map(p => p.lbl), v = ps.map(p => ttm(agg, p.end)), vp = ps.map(p => ttmPct(agg, p.end));
+  document.getElementById(capBar).textContent = "Net inflow over the 12 months to each period-end, \u20b9 Cr";
+  document.getElementById(capPct).textContent = "Same rolling 12-month inflow as % of AUM 12 months earlier";
+  mk(idBar, { data: { labels, datasets: [bar(v, v.map(x => x == null || x >= 0 ? cssv("--s1") : cssv("--neg")), { label: "Rolling 12M net inflow" })] },
+    options: baseOpts({ plugins: { tooltip: { callbacks: { label: c => " 12M net inflow  " + fmtCr(c.parsed.y) } } }, scales: { x: baseOpts().scales.x, y: Object.assign(baseOpts().scales.y, { ticks: { color: cssv("--muted"), font: { size: 11 }, callback: axisCr } }) } }) });
+  mk(idPct, { data: { labels, datasets: [line(vp, cssv("--s7"), { label: "12M inflow % of AUM 12m earlier" })] }, _fmt: v => fmtPct(v, 1),
+    options: baseOpts({ plugins: { tooltip: { callbacks: { label: c => " " + fmtPct(c.parsed.y, 1) } } }, scales: { x: baseOpts().scales.x, y: Object.assign(baseOpts().scales.y, { beginAtZero: true, ticks: { color: cssv("--muted"), font: { size: 11 }, callback: v => v + "%" } }) } }) });
+}
+// growth & flow ratios by period, periods as columns (agg = monthAgg() output over ALL months)
+function growthTable(agg, ps){
+  const cols = ps.map(p => {
+    // opening = previous period's closing AUM (so NFOs / renames between the two show up in the residual row)
+    const e = p.end, s0 = p.months[0], close = agg[e].aum, open = s0 > 0 && agg[s0 - 1].aum ? agg[s0 - 1].aum : agg[s0].open;
+    const flow = p.months.reduce((x, m) => x + agg[m].flow, 0), mtm = p.months.reduce((x, m) => x + agg[m].mtm, 0);
+    const jY = M.findIndex((x, i) => MM[i].y === MM[e].y - 1 && MM[i].mo === MM[e].mo);
+    const jF = M.findIndex((x, i) => MM[i].y === MM[e].fy - 1 && MM[i].mo === 3);
+    const yoy = jY >= 0 && agg[jY].aum ? (close / agg[jY].aum - 1) * 100 : null;
+    const ytd = jF >= 0 && agg[jF].aum && jF < e ? (close / agg[jF].aum - 1) * 100 : null;
+    const ys = yoySplit(agg, e);
+    const avgOf = ms => { const v = ms.filter(m => m >= 0 && m < NM && agg[m].aum); return v.length ? v.reduce((x, m) => x + agg[m].aum, 0) / v.length : null; };
+    const avg = avgOf(p.months), avgY = avgOf(p.months.map(m => m - 12)), avgQ = avgOf(p.months.map(m => m - p.months.length));
+    const avgYoy = avg != null && avgY ? (avg / avgY - 1) * 100 : null, avgQoq = avg != null && avgQ ? (avg / avgQ - 1) * 100 : null;
+    return { lbl: p.lbl, close, open, flow, mtm, other: close - open - flow - mtm, yoy, ytd, ttm: ttm(agg, e), ttmp: ttmPct(agg, e), yf: ys.f, ym: ys.mtm, yo: ys.o, avg, avgYoy, avgQoq,
+             fpct: open ? flow / open * 100 : null, mpct: open ? mtm / open * 100 : null, opct: open ? (close - open - flow - mtm) / open * 100 : null };
+  });
+  const pct = v => v == null ? "\u00b7" : (v > 0 ? "+" : "") + v.toFixed(1) + "%";
+  const rows = [
+    ["Closing AUM (\u20b9 Cr)", c => fmtNum(c.close), true], ["AUM growth YoY %", c => pct(c.yoy), true],
+    ["of which: net inflow, last 12 months (% of AUM 12m earlier)", c => pct(c.yf), false, 1],
+    ["of which: mark-to-market, last 12 months", c => pct(c.ym), false, 1],
+    ["of which: NFOs & scheme changes, last 12 months", c => pct(c.yo), false, 1],
+    ["AUM growth FY-to-date %", c => pct(c.ytd)],
+    ["Average AUM over the period, mean of month-ends (\u20b9 Cr)", c => c.avg == null ? "\u00b7" : fmtNum(c.avg), true],
+    ["Average AUM YoY % (vs same period a year earlier)", c => pct(c.avgYoy), false, 1],
+    ["Average AUM vs previous period % (QoQ / MoM / YoY by frequency)", c => pct(c.avgQoq), false, 1],
+    ["Opening AUM = previous period close (\u20b9 Cr)", c => fmtNum(c.open)], ["Net inflow (\u20b9 Cr)", c => fmtNum(c.flow), true], ["Inflow as % of opening AUM", c => pct(c.fpct), true],
+    ["Rolling 12M net inflow (\u20b9 Cr)", c => c.ttm == null ? "\u00b7" : fmtNum(c.ttm)],
+    ["Mark-to-market as % of opening AUM", c => pct(c.mpct)], ["NFOs & scheme changes as % of opening AUM", c => pct(c.opct)],
+  ];
+  const t = document.createElement("table"); t.className = "fin-tbl growth"; t.style.width = (330 + cols.length * 88) + "px";
+  const cg = document.createElement("colgroup"); [330].concat(cols.map(() => 88)).forEach(w => { const c = document.createElement("col"); c.style.width = w + "px"; cg.appendChild(c); }); t.appendChild(cg);
+  const th = document.createElement("thead"), tr = document.createElement("tr"); const h0 = document.createElement("th"); h0.textContent = ({ M: "Month", Q: "Quarter", FY: "Financial year", YTD: "Month" })[st.period]; tr.appendChild(h0);
+  const need = st.period === "Q" ? 3 : st.period === "FY" ? 12 : 1;
+  cols.forEach((c, i) => { const h = document.createElement("th"); const n = ps[i].months.length; h.textContent = n < need ? c.lbl + " (" + n + "m)" : c.lbl; if (n < need) h.title = "Partial period: " + n + " of " + need + " months, to " + MM[ps[i].end].full; tr.appendChild(h); }); th.appendChild(tr); t.appendChild(th);
+  const tb = document.createElement("tbody");
+  rows.forEach(([label, fn, bold, ind]) => { const row = document.createElement("tr"); if (bold) row.className = "tot"; const a = document.createElement("td"); a.textContent = label; if (ind) a.className = "ind" + ind; row.appendChild(a);
+    cols.forEach(c => { const td = document.createElement("td"); const v = fn(c); td.textContent = v; if (v.startsWith("-")) td.className = "neg"; row.appendChild(td); }); tb.appendChild(row); });
+  t.appendChild(tb); const sc = document.createElement("div"); sc.className = "fin-scroll"; sc.appendChild(t); return sc;
+}
+
+// periods: list of {lbl, months:[...], end}
+function buildPeriods(mode){
+  if (mode === "M" || mode === "YTD") return MM.map((m, i) => ({ lbl: m.lbl, full: m.full, months: [i], end: i }));
+  const key = mode === "Q" ? "qlbl" : "fylbl", out = [], idx = {};
+  MM.forEach((m, i) => {
+    if (!(m[key] in idx)){ idx[m[key]] = out.length; out.push({ lbl: m[key], full: m[key], months: [], end: i }); }
+    const p = out[idx[m[key]]]; p.months.push(i); p.end = i;
+  });
+  return out;
+}
+let PERIODS = buildPeriods("M");
+function curPeriodIdx(){ return PERIODS.findIndex(p => p.end === st.asOf); }
+// period window for time-series charts
+function tsPeriods(){
+  const ci = curPeriodIdx(), upto = PERIODS.slice(0, ci + 1);
+  if (st.period === "YTD"){ const fy = MM[st.asOf].fy; return upto.filter(p => MM[p.end].fy === fy); }
+  if (!st.range) return upto;
+  const endY = MM[st.asOf].y, endMo = MM[st.asOf].mo;
+  return upto.filter(p => { const m = MM[p.end]; return (endY - m.y) * 12 + (endMo - m.mo) < st.range * 12; });
+}
+// KPI period (months) — for YTD it is the FY-to-date window
+function kpiMonths(){
+  if (st.period === "YTD"){ const fy = MM[st.asOf].fy; return MM.map((m,i)=>i).filter(i => i <= st.asOf && MM[i].fy === fy); }
+  return PERIODS[curPeriodIdx()].months;
+}
+function kpiLabel(){
+  const p = PERIODS[curPeriodIdx()];
+  if (st.period === "YTD"){ const ms = kpiMonths(); return MM[st.asOf].fylbl + " YTD (" + MM[ms[0]].lbl + " – " + MM[ms[ms.length-1]].lbl + ")"; }
+  const need = st.period === "Q" ? 3 : st.period === "FY" ? 12 : 1;
+  return p.months.length < need ? p.full + " (partial: " + p.months.length + " of " + need + " months)" : p.full;
+}
+// aggregate rows over a set of months, grouped by a key fn → {key:{flow,aum,open}}
+function aggBy(months, keyFn, rows = ROWS){
+  const set = new Set(months), last = months[months.length-1], first = months[0], out = new Map();
+  for (const r of rows){
+    if (!set.has(r[1])) continue;
+    const k = keyFn(r); let o = out.get(k); if (!o){ o = { flow: 0, aum: 0, open: 0 }; out.set(k, o); }
+    o.flow += r[2]; if (r[1] === last) o.aum += r[3]; if (r[1] === first) o.open += r[4];
+  }
+  return out;
+}
+const sumMonths = (months, f = "flow") => months.reduce((a, i) => a + byMonth[i][f], 0);
+const periodFlow = p => sumMonths(p.months);
+const periodAum = p => byMonth[p.end].aum;
+const periodOpen = p => byMonth[p.months[0]].open;
+
+// fixed colour assignment: category rank by latest AUM (unfiltered), AMC rank = index in A
+const catRank = (() => {
+  const t = new Array(C.length).fill(0);
+  for (const r of R) if (r[1] === NM-1) t[S[r[0]][2]] += r[3];
+  return C.map((c,i) => i).sort((a,b) => t[b]-t[a]);
+})();
+const catSlot = new Map(catRank.slice(0,7).map((ci, k) => [ci, k]));
+const catColor = ci => catSlot.has(ci) ? SLOTS()[catSlot.get(ci)] : cssv("--other");
+const amcColor = ai => ai < 8 ? SLOTS()[ai] : cssv("--other");
+
+// ── Chart.js helpers ───────────────────────────────────────────────────────
+const CH = {};
+function baseOpts(extra){
+  const muted = cssv("--muted"), grid = cssv("--grid"), axis = cssv("--axis"), card = cssv("--card"), text = cssv("--text");
+  const base = {
+    responsive: true, maintainAspectRatio: false, animation: { duration: 250 },
+    interaction: { mode: "index", intersect: false },
+    plugins: {
+      legend: { display: false, position: "bottom", labels: { color: cssv("--text2"), usePointStyle: true, boxWidth: 8, boxHeight: 8, padding: 14, font: { size: 11 } } },
+      tooltip: { backgroundColor: card, titleColor: text, bodyColor: text, borderColor: cssv("--border"), borderWidth: 1,
+                 padding: 10, usePointStyle: true, boxWidth: 8, boxHeight: 8, titleFont: { weight: "600" } }
+    },
+    scales: {
+      x: { grid: { display: false }, border: { color: axis }, ticks: { color: muted, font: { size: 11 }, maxRotation: 0, autoSkip: true, autoSkipPadding: 12 } },
+      y: { grid: { color: grid }, border: { display: false }, ticks: { color: muted, font: { size: 11 } } }
+    }
+  };
+  if (!extra) return base;
+  // merge one level deep for plugins / scales so callers can override a single key
+  for (const k of Object.keys(extra)){
+    if ((k === "plugins" || k === "scales") && extra[k]){
+      base[k] = base[k] || {};
+      for (const kk of Object.keys(extra[k])) base[k][kk] = Object.assign({}, base[k][kk] || {}, extra[k][kk]);
+    } else base[k] = extra[k];
+  }
+  return base;
+}
+const lift = c => c;                                   // hovered mark colour (handled by Chart.js hover)
+function bar(data, colors, o){ return Object.assign({ type: "bar", data, backgroundColor: colors, borderRadius: 4, borderSkipped: "start",
+  borderColor: cssv("--card"), borderWidth: 1, maxBarThickness: 34, categoryPercentage: .8, barPercentage: .9 }, o || {}); }
+function line(data, color, o){ return Object.assign({ type: "line", data, borderColor: color, backgroundColor: color, borderWidth: 2,
+  pointRadius: 0, pointHoverRadius: 5, pointHitRadius: 12, tension: .25, spanGaps: false }, o || {}); }
+function mk(id, cfg, tableSpec){
+  if (CH[id]) CH[id].destroy();
+  const cv = document.getElementById(id);
+  CH[id] = new Chart(cv, cfg);
+  // table twin
+  const card = cv.closest(".card"), tv = card.querySelector(".tv");
+  if (tv){
+    tv.replaceChildren(buildTable(tableSpec || tableFromChart(cfg)));
+  }
+}
+function tableFromChart(cfg){
+  const labels = cfg.data.labels || [], ds = cfg.data.datasets;
+  return { head: [""].concat(ds.map(d => d.label || "Value")),
+           rows: labels.map((l, i) => [l].concat(ds.map(d => { const v = d.data[i]; return v && typeof v === "object" ? v.y : v; }))),
+           fmt: cfg._fmt || fmtCr };
+}
+function buildTable(spec){
+  const t = document.createElement("table"), th = document.createElement("thead"), tb = document.createElement("tbody"), tr = document.createElement("tr");
+  spec.head.forEach(h => { const c = document.createElement("th"); c.textContent = h; tr.appendChild(c); }); th.appendChild(tr);
+  spec.rows.forEach(r => { const row = document.createElement("tr");
+    r.forEach((v, i) => { const c = document.createElement("td");
+      if (i === 0 || typeof v === "string"){ c.textContent = v == null ? "—" : v; }
+      else { const f = (spec.fmts && spec.fmts[i]) || spec.fmt; c.textContent = f(v); if (spec.sign !== false && typeof v === "number" && v !== 0 && spec.fmt === fmtCr) c.className = v > 0 ? "p" : "n"; }
+      row.appendChild(c); }); tb.appendChild(row); });
+  t.append(th, tb); return t;
+}
+document.querySelectorAll(".tbtn").forEach(b => b.onclick = () => { const c = b.closest(".card"); c.classList.toggle("table"); b.textContent = c.classList.contains("table") ? "Chart" : "Table"; });
+
+// direct-label plugin for scatter (labels top N by |x|+|y|)
+const scatterLabels = { id: "scatterLabels", afterDatasetsDraw(chart, args, opts){
+  const ds = chart.data.datasets[0]; if (!ds || !opts.n) return; const meta = chart.getDatasetMeta(0), ctx = chart.ctx;
+  const idx = ds.data.map((p,i)=>i).sort((a,b)=> (Math.abs(ds.data[b].x)+Math.abs(ds.data[b].y)) - (Math.abs(ds.data[a].x)+Math.abs(ds.data[a].y))).slice(0, opts.n);
+  ctx.save(); ctx.font = "11px system-ui,sans-serif"; ctx.fillStyle = cssv("--text2"); ctx.textBaseline = "middle";
+  for (const i of idx){ const e = meta.data[i]; ctx.fillText(ds.data[i].name, e.x + 9, e.y); } ctx.restore(); } };
+Chart.register(scatterLabels);
+
+// ── KPIs ───────────────────────────────────────────────────────────────────
+function renderKpis(){
+  const ci = curPeriodIdx(), months = kpiMonths(), lbl = kpiLabel();
+  const flow = sumMonths(months), aum = byMonth[st.asOf].aum, open = byMonth[months[0]].open;
+  let prevFlow = null, prevLbl = "";
+  if (st.period !== "YTD" && ci > 0){ prevFlow = periodFlow(PERIODS[ci-1]); prevLbl = PERIODS[ci-1].lbl; }
+  const fy = MM[st.asOf].fy, fyMonths = MM.map((m,i)=>i).filter(i => i <= st.asOf && MM[i].fy === fy);
+  const fyFlow = sumMonths(fyMonths);
+  const byAmc = aggBy(months, r => S[r[0]][1]); let nIn = 0, nAmc = 0; for (const v of byAmc.values()){ nAmc++; if (v.flow > 0) nIn++; }
+  const nSch = new Set(ROWS.filter(r => r[1] === st.asOf).map(r => r[0])).size;
+  const pct = open ? flow / open * 100 : 0;
+  const items = [
+    ["Net flow", fmtCr(flow), prevFlow == null ? lbl : lbl + " · " + (flow - prevFlow >= 0 ? "▲" : "▼") + " " + fmtCr(Math.abs(flow - prevFlow)) + " vs " + prevLbl, flow >= 0 ? "up" : "dn"],
+    [MM[st.asOf].fylbl + " YTD net flow", fmtCr(fyFlow), fyMonths.length + " month" + (fyMonths.length > 1 ? "s" : "") + " to " + MM[st.asOf].lbl, fyFlow >= 0 ? "up" : "dn"],
+    ["Industry AUM", fmtCr(aum), fmtNum(nSch) + " schemes · " + nAmc + " AMCs · " + MM[st.asOf].full, ""],
+    ["AMCs with inflow", nIn + " / " + nAmc, "positive net flow in " + lbl, ""],
+    ["Flow / opening AUM", fmtPct(pct), lbl, pct >= 0 ? "up" : "dn"],
+  ];
+  document.getElementById("kpis").replaceChildren(...items.map(([k, v, s, cls]) => {
+    const d = document.createElement("div"); d.className = "kpi";
+    const a = document.createElement("div"); a.className = "k"; a.textContent = k;
+    const b = document.createElement("div"); b.className = "v " + cls; b.textContent = v;
+    const c = document.createElement("div"); c.className = "s"; c.textContent = s;
+    d.append(a, b, c); return d; }));
+}
+
+// ── Overview ───────────────────────────────────────────────────────────────
+function renderOverview(){
+  const ps = tsPeriods(), labels = ps.map(p => p.lbl);
+  const flows = ps.map(periodFlow), pos = cssv("--pos"), neg = cssv("--neg");
+  document.getElementById("cap_flow").textContent = "₹ Cr per " + ({M:"month",Q:"quarter",FY:"financial year",YTD:"month, " + MM[st.asOf].fylbl + " to date"})[st.period] + " — " + ps[0].lbl + " to " + ps[ps.length-1].lbl;
+  mk("c_flow", { data: { labels, datasets: [bar(flows, flows.map(v => v >= 0 ? pos : neg), { label: "Net flow" })] },
+    options: baseOpts({ plugins: { tooltip: { callbacks: { label: c => " Net flow  " + fmtCr(c.parsed.y) } } },
+      scales: { x: baseOpts().scales.x, y: Object.assign(baseOpts().scales.y, { ticks: { color: cssv("--muted"), font: { size: 11 }, callback: axisCr } }) } }) });
+  document.getElementById("cap_ovGrowth").textContent = "Industry \u00b7 YoY compares closing AUM with the same period-end a year earlier, FY-to-date with the previous March; average AUM is the mean of month-end AUM in the period (the proxy for reported quarterly average AUM); inflow, mark-to-market and NFOs/scheme changes are for the period, as % of the previous period's closing AUM, and add up to the period's growth";
+  document.getElementById("ovGrowth").replaceChildren(growthTable(byMonth, ps));
+  ttmCharts("c_ovTtm", "c_ovTtmPct", byMonth, ps, "cap_ovTtm", "cap_ovTtmPct");
+  const pcts = ps.map(p => { const o = periodOpen(p); return o ? periodFlow(p) / o * 100 : null; });
+  mk("c_flowpct", { data: { labels, datasets: [line(pcts, cssv("--s7"), { label: "Flow / opening AUM %" })] }, _fmt: v => fmtPct(v, 2),
+    options: baseOpts({ plugins: { tooltip: { callbacks: { label: c => " " + fmtPct(c.parsed.y, 2) } } },
+      scales: { x: baseOpts().scales.x, y: Object.assign(baseOpts().scales.y, { ticks: { color: cssv("--muted"), font: { size: 11 }, callback: v => v + "%" } }) } }) });
+  const aums = ps.map(periodAum);
+  mk("c_aum", { data: { labels, datasets: [bar(aums, cssv("--s1"), { label: "AUM" })] },
+    options: baseOpts({ plugins: { tooltip: { callbacks: { label: c => " AUM  " + fmtCr(c.parsed.y) } } },
+      scales: { x: baseOpts().scales.x, y: Object.assign(baseOpts().scales.y, { ticks: { color: cssv("--muted"), font: { size: 11 }, callback: axisCr } }) } }) });
+  const yoy = ps.map(p => { const m = MM[p.end], j = M.findIndex((x, i) => MM[i].y === m.y - 1 && MM[i].mo === m.mo); return j >= 0 && byMonth[j].aum ? (byMonth[p.end].aum / byMonth[j].aum - 1) * 100 : null; });
+  mk("c_yoy", { data: { labels, datasets: [line(yoy, cssv("--s2"), { label: "YoY AUM growth %" })] }, _fmt: v => fmtPct(v, 1),
+    options: baseOpts({ plugins: { tooltip: { callbacks: { label: c => " YoY  " + fmtPct(c.parsed.y) } } },
+      scales: { x: baseOpts().scales.x, y: Object.assign(baseOpts().scales.y, { ticks: { color: cssv("--muted"), font: { size: 11 }, callback: v => v + "%" } }) } }) });
+  // category stack
+  const top = catRank.slice(0,7).filter(ci => (st.cat === "All" || C[ci].g === st.cat) && !(st.exArb && ci === ARB));
+  const perP = ps.map(p => aggBy(p.months, r => S[r[0]][2]));
+  const ds = top.map(ci => bar(perP.map(m => (m.get(ci) || {flow:0}).flow), catColor(ci), { label: C[ci].n, borderRadius: 2 }));
+  ds.push(bar(perP.map((m, k) => { let s = 0; for (const [ci, v] of m) if (!top.includes(ci)) s += v.flow; return s; }), cssv("--other"), { label: "Other", borderRadius: 2 }));
+  mk("c_catstack", { data: { labels, datasets: ds },
+    options: baseOpts({ plugins: { legend: { display: true }, tooltip: { callbacks: { label: c => " " + c.dataset.label + "  " + fmtCr(c.parsed.y) } } },
+      scales: { x: Object.assign(baseOpts().scales.x, { stacked: true }), y: Object.assign(baseOpts().scales.y, { stacked: true, ticks: { color: cssv("--muted"), font: { size: 11 }, callback: axisCr } }) } }) });
+}
+
+// ── Categories ─────────────────────────────────────────────────────────────
+function hbarOpts(fmt, extra){
+  const o = baseOpts({ indexAxis: "y", interaction: { mode: "nearest", axis: "y", intersect: false } });
+  o.scales = { x: { grid: { color: cssv("--grid") }, border: { display: false }, ticks: { color: cssv("--muted"), font: { size: 11 }, callback: axisCr } },
+               y: { grid: { display: false }, border: { color: cssv("--axis") }, ticks: { color: cssv("--text2"), font: { size: 11 }, autoSkip: false } } };
+  o.plugins.tooltip.callbacks = { label: c => " " + fmt(c.parsed.x) };
+  return Object.assign(o, extra || {});
+}
+function renderCats(){
+  const months = kpiMonths(), lbl = kpiLabel(), agg = aggBy(months, r => S[r[0]][2]);
+  const totAum = [...agg.values()].reduce((a, v) => a + v.aum, 0);
+  const byAum = [...agg.entries()].sort((a, b) => b[1].aum - a[1].aum);
+  document.getElementById("cap_cataum").textContent = "Closing AUM, " + MM[st.asOf].full + " — share of industry in brackets";
+  mk("c_cataum", { data: { labels: byAum.map(([ci, v]) => C[ci].n + "  (" + (v.aum / totAum * 100).toFixed(1) + "%)"), datasets: [bar(byAum.map(([, v]) => v.aum), cssv("--s1"), { label: "AUM" })] },
+    options: hbarOpts(fmtCr) });
+  const byFlow = [...agg.entries()].sort((a, b) => b[1].flow - a[1].flow);
+  document.getElementById("cap_catflow").textContent = "Net flow, " + lbl;
+  mk("c_catflow", { data: { labels: byFlow.map(([ci]) => C[ci].n), datasets: [bar(byFlow.map(([, v]) => v.flow), byFlow.map(([, v]) => v.flow >= 0 ? cssv("--pos") : cssv("--neg")), { label: "Net flow" })] },
+    options: hbarOpts(fmtCr) });
+  // heatmap
+  const ps = tsPeriods(), perP = ps.map(p => aggBy(p.months, r => S[r[0]][2]));
+  const cats = catRank.filter(ci => (st.cat === "All" || C[ci].g === st.cat) && !(st.exArb && ci === ARB));
+  // shade scale capped at the 90th percentile of |flow| so one outlier does not flatten the rest
+  const allv = []; perP.forEach(m => m.forEach(v => allv.push(Math.abs(v.flow)))); allv.sort((a, b) => a - b);
+  const mx = Math.max(1, allv[Math.floor(allv.length * 0.9)] || 1);
+  const heatFmt = v => { const a = Math.abs(v); return (v < 0 ? "−" : "") + (a >= 1e5 ? (a/1e5).toFixed(1) + "L" : a >= 1e3 ? (a/1e3).toFixed(1) + "K" : String(Math.round(a))); };
+  const t = document.createElement("table"), th = document.createElement("thead"), tr = document.createElement("tr");
+  tr.appendChild(document.createElement("th")); ps.forEach(p => { const c = document.createElement("th"); c.textContent = p.lbl; tr.appendChild(c); }); th.appendChild(tr);
+  const tb = document.createElement("tbody"), pos = cssv("--pos"), neg = cssv("--neg"), dark = document.documentElement.getAttribute("data-theme") === "dark";
+  cats.forEach(ci => { const row = document.createElement("tr"); const h = document.createElement("td"); h.textContent = C[ci].n; h.title = C[ci].n; row.appendChild(h);
+    perP.forEach(m => { const v = (m.get(ci) || {flow:0}).flow, c = document.createElement("td"); const a = Math.min(1, Math.abs(v) / mx);
+      c.textContent = Math.abs(v) < 0.5 ? "·" : heatFmt(v);
+      c.style.background = `color-mix(in oklab, ${v >= 0 ? pos : neg} ${Math.round(8 + a * (dark ? 72 : 62))}%, ${cssv("--card")})`;
+      c.style.color = a > .55 ? "#fff" : cssv("--text"); c.title = C[ci].n + " · " + m.lbl + ": " + fmtCr(v); row.appendChild(c); }); tb.appendChild(row); });
+  t.append(th, tb); document.getElementById("heat").replaceChildren(t);
+  // AUM mix over time (100% stacked)
+  const top = catRank.slice(0,7).filter(ci => cats.includes(ci)), labels = ps.map(p => p.lbl);
+  const tot = perP.map(m => { let s = 0; for (const v of m.values()) s += v.aum; return s || 1; });
+  const ds = top.map(ci => bar(perP.map((m, k) => (m.get(ci) || {aum:0}).aum / tot[k] * 100), catColor(ci), { label: C[ci].n, borderRadius: 2 }));
+  ds.push(bar(perP.map((m, k) => { let s = 0; for (const [ci, v] of m) if (!top.includes(ci)) s += v.aum; return s / tot[k] * 100; }), cssv("--other"), { label: "Other", borderRadius: 2 }));
+  mk("c_catmix", { data: { labels, datasets: ds }, _fmt: v => v.toFixed(1) + "%",
+    options: baseOpts({ plugins: { legend: { display: true }, tooltip: { callbacks: { label: c => " " + c.dataset.label + "  " + c.parsed.y.toFixed(1) + "%" } } },
+      scales: { x: Object.assign(baseOpts().scales.x, { stacked: true }), y: Object.assign(baseOpts().scales.y, { stacked: true, max: 100, ticks: { color: cssv("--muted"), font: { size: 11 }, callback: v => v + "%" } }) } }) });
+}
+
+// ── AMCs ───────────────────────────────────────────────────────────────────
+function renderAmcs(){
+  const months = kpiMonths(), lbl = kpiLabel(), agg = aggBy(months, r => S[r[0]][1]);
+  const ent = [...agg.entries()], totFlow = ent.reduce((a, [, v]) => a + v.flow, 0), totAum = ent.reduce((a, [, v]) => a + v.aum, 0);
+  const byFlow = ent.slice().sort((a, b) => b[1].flow - a[1].flow), top20f = byFlow.slice(0, 20);
+  document.getElementById("cap_amcflow").textContent = "Net flow, " + lbl + " — top 20 of " + ent.length + " AMCs";
+  mk("c_amcflow", { data: { labels: top20f.map(([ai]) => A[ai]), datasets: [bar(top20f.map(([, v]) => v.flow), top20f.map(([, v]) => v.flow >= 0 ? cssv("--pos") : cssv("--neg")), { label: "Net flow" })] }, options: hbarOpts(fmtCr) });
+  const byAum = ent.slice().sort((a, b) => b[1].aum - a[1].aum), top20a = byAum.slice(0, 20);
+  document.getElementById("cap_amcaum").textContent = "Closing AUM, " + MM[st.asOf].full + " — share of industry in brackets";
+  mk("c_amcaum", { data: { labels: top20a.map(([ai, v]) => A[ai] + "  (" + (v.aum / totAum * 100).toFixed(1) + "%)"), datasets: [bar(top20a.map(([, v]) => v.aum), cssv("--s1"), { label: "AUM" })] }, options: hbarOpts(fmtCr) });
+  // scatter
+  document.getElementById("cap_scatter").textContent = "Top 20 AMCs by AUM, " + lbl + ". Above the diagonal = winning more than its size; industry net flow " + fmtCr(totFlow);
+  const pts = top20a.map(([ai, v]) => ({ x: v.aum / totAum * 100, y: totFlow > 0 ? v.flow / totFlow * 100 : null, name: A[ai] })).filter(p => p.y != null);
+  const mxx = Math.max(...pts.map(p => p.x)) * 1.1;
+  const so = baseOpts({ interaction: { mode: "nearest", intersect: false }, plugins: { scatterLabels: { n: 10 }, tooltip: { callbacks: { title: c => c[0].raw.name, label: c => [" AUM share  " + c.parsed.x.toFixed(1) + "%", " Inflow share  " + c.parsed.y.toFixed(1) + "%"] } } } });
+  so.scales = { x: { type: "linear", min: 0, max: mxx, title: { display: true, text: "AUM share %", color: cssv("--muted"), font: { size: 11 } }, grid: { color: cssv("--grid") }, border: { display: false }, ticks: { color: cssv("--muted"), font: { size: 11 } } },
+                y: { type: "linear", title: { display: true, text: "Net inflow share %", color: cssv("--muted"), font: { size: 11 } }, grid: { color: cssv("--grid") }, border: { display: false }, ticks: { color: cssv("--muted"), font: { size: 11 } } } };
+  mk("c_scatter", { data: { datasets: [
+      { type: "scatter", data: pts, backgroundColor: cssv("--s1"), borderColor: cssv("--card"), borderWidth: 2, pointRadius: 7, pointHoverRadius: 10, pointHitRadius: 14 },
+      { type: "line", data: [{ x: 0, y: 0 }, { x: mxx, y: mxx }], borderColor: cssv("--axis"), borderWidth: 1, pointRadius: 0, pointHitRadius: 0 } ] },
+    options: so },
+    { head: ["AMC", "AUM share %", "Inflow share %"], rows: pts.map(p => [p.name, p.x, p.y]), fmt: v => v.toFixed(1) + "%", sign: false });
+  // share trends (top 8 by current AUM = first 8 in A)
+  const ps = tsPeriods(), labels = ps.map(p => p.lbl), perP = ps.map(p => aggBy(p.months, r => S[r[0]][1]));
+  const top8 = A.map((a, i) => i).slice(0, 8);
+  const totA = perP.map(m => { let s = 0; for (const v of m.values()) s += v.aum; return s || 1; });
+  const totF = perP.map(m => { let s = 0; for (const v of m.values()) s += v.flow; return s; });
+  mk("c_sharetrend", { data: { labels, datasets: top8.map(ai => line(perP.map((m, k) => (m.get(ai) || {aum:0}).aum / totA[k] * 100), amcColor(ai), { label: A[ai] })) }, _fmt: v => v == null ? "—" : v.toFixed(1) + "%",
+    options: baseOpts({ plugins: { legend: { display: true }, tooltip: { callbacks: { label: c => " " + c.dataset.label + "  " + c.parsed.y.toFixed(1) + "%" } } },
+      scales: { x: baseOpts().scales.x, y: Object.assign(baseOpts().scales.y, { ticks: { color: cssv("--muted"), font: { size: 11 }, callback: v => v + "%" } }) } }) });
+  // share of inflow is only meaningful when the industry total is material: blank periods below 0.1% of AUM
+  const okF = totF.map((f, k) => f > 0.001 * totA[k]);
+  // rolling 12M inflow share: per-AMC monthly flows, summed over the 12 months to each period end
+  const amcM = new Map(top8.map(ai => [ai, new Float64Array(NM)])), indM = new Float64Array(NM);
+  for (const r of ROWS){ indM[r[1]] += r[2]; const a = amcM.get(S[r[0]][1]); if (a) a[r[1]] += r[2]; }
+  const w12 = (arr, e) => { if (e < 11) return null; let x = 0; for (let i = e - 11; i <= e; i++) x += arr[i]; return x; };
+  const indT = ps.map(p => w12(indM, p.end));
+  mk("c_inflowttm", { data: { labels, datasets: top8.map(ai => line(ps.map((p, k) => { const t = w12(amcM.get(ai), p.end); return t == null || !indT[k] || indT[k] < 0.001 * totA[k] ? null : t / indT[k] * 100; }), amcColor(ai), { label: A[ai] })) }, _fmt: v => v == null ? "\u2014" : v.toFixed(1) + "%",
+    options: baseOpts({ plugins: { legend: { display: true }, tooltip: { callbacks: { label: c => " " + c.dataset.label + "  " + (c.parsed.y == null ? "\u2014" : c.parsed.y.toFixed(1) + "%") } } },
+      scales: { x: baseOpts().scales.x, y: Object.assign(baseOpts().scales.y, { ticks: { color: cssv("--muted"), font: { size: 11 }, callback: v => v + "%" } }) } }) });
+  mk("c_inflowtrend", { data: { labels, datasets: top8.map(ai => line(perP.map((m, k) => okF[k] ? (m.get(ai) || {flow:0}).flow / totF[k] * 100 : null), amcColor(ai), { label: A[ai] })) }, _fmt: v => v == null ? "\u2014" : v.toFixed(1) + "%",
+    options: baseOpts({ plugins: { legend: { display: true }, tooltip: { callbacks: { label: c => " " + c.dataset.label + "  " + (c.parsed.y == null ? "—" : c.parsed.y.toFixed(1) + "%") } } },
+      scales: { x: baseOpts().scales.x, y: Object.assign(baseOpts().scales.y, { ticks: { color: cssv("--muted"), font: { size: 11 }, callback: v => v + "%" } }) } }) });
+}
+
+// ── AMC deep-dive ──────────────────────────────────────────────────────────
+function renderDD(){
+  const ai = st.amc, name = A[ai], months = kpiMonths(), lbl = kpiLabel();
+  const rows = ROWS.filter(r => S[r[0]][1] === ai && (st.type === "All" || S[r[0]][2] === +st.type));
+  const tname = st.type === "All" ? "all scheme types" : C[+st.type].n;
+  const ps = tsPeriods(), labels = ps.map(p => p.lbl);
+  const per = ps.map(p => { const a = aggBy(p.months, () => 0, rows).get(0) || { flow: 0, aum: 0, open: 0 }; return a; });
+  document.getElementById("cap_ddflow").textContent = name + " · " + tname + " · ₹ Cr per period";
+  mk("c_ddflow", { data: { labels, datasets: [bar(per.map(a => a.flow), per.map(a => a.flow >= 0 ? cssv("--pos") : cssv("--neg")), { label: "Net flow" })] },
+    options: baseOpts({ plugins: { tooltip: { callbacks: { label: c => " Net flow  " + fmtCr(c.parsed.y) } } }, scales: { x: baseOpts().scales.x, y: Object.assign(baseOpts().scales.y, { ticks: { color: cssv("--muted"), font: { size: 11 }, callback: axisCr } }) } }) });
+  document.getElementById("cap_ddaum").textContent = name + " · " + tname + " · closing AUM";
+  mk("c_ddaum", { data: { labels, datasets: [bar(per.map(a => a.aum), cssv("--s1"), { label: "AUM" })] },
+    options: baseOpts({ plugins: { tooltip: { callbacks: { label: c => " AUM  " + fmtCr(c.parsed.y) } } }, scales: { x: baseOpts().scales.x, y: Object.assign(baseOpts().scales.y, { ticks: { color: cssv("--muted"), font: { size: 11 }, callback: axisCr } }) } }) });
+  const aggD = monthAgg(rows);
+  document.getElementById("cap_ddGrowth").textContent = name + " \u00b7 " + tname + " \u00b7 YoY vs the same period-end a year earlier, FY-to-date vs the previous March; average AUM = mean of month-end AUM in the period (proxy for reported QAAUM); inflow, mark-to-market and NFOs/scheme changes as % of the previous period's closing AUM, adding up to the period's growth";
+  document.getElementById("ddGrowth").replaceChildren(growthTable(aggD, ps));
+  ttmCharts("c_ddTtm", "c_ddTtmPct", aggD, ps, "cap_ddTtm", "cap_ddTtmPct");
+  document.getElementById("cap_ddpct").textContent = name + " \u00b7 " + tname + " \u00b7 net inflow for each period as % of its opening AUM";
+  const pFlow = p => p.months.reduce((x, m) => x + aggD[m].flow, 0), pOpen = p => aggD[p.months[0]].open;
+  mk("c_ddpct", { data: { labels, datasets: [bar(ps.map(p => pOpen(p) ? pFlow(p) / pOpen(p) * 100 : null), ps.map(p => pFlow(p) >= 0 ? cssv("--pos") : cssv("--neg")), { label: "Inflow % of opening AUM" })] }, _fmt: v => fmtPct(v, 1),
+    options: baseOpts({ plugins: { tooltip: { callbacks: { label: c => " " + fmtPct(c.parsed.y, 1) } } }, scales: { x: baseOpts().scales.x, y: Object.assign(baseOpts().scales.y, { ticks: { color: cssv("--muted"), font: { size: 11 }, callback: v => v + "%" } }) } }) });
+  const byCat = [...aggBy(months, r => S[r[0]][2], rows).entries()].sort((a, b) => b[1].flow - a[1].flow);
+  document.getElementById("cap_ddcat").textContent = name + " · " + lbl;
+  mk("c_ddcat", { data: { labels: byCat.map(([ci]) => C[ci].n), datasets: [bar(byCat.map(([, v]) => v.flow), byCat.map(([, v]) => v.flow >= 0 ? cssv("--pos") : cssv("--neg")), { label: "Net flow" })] }, options: hbarOpts(fmtCr) });
+  const bySch = [...aggBy(months, r => r[0], rows).entries()];
+  // strip the words every scheme of this AMC shares (its house prefix), plus a trailing " Fund"
+  const names = S.filter(s => s[1] === ai).map(s => s[0].split(" "));
+  let pre = names.length ? names[0].slice(0, 3) : [];
+  for (const w of names){ let k = 0; while (k < pre.length && w[k] === pre[k]) k++; pre = pre.slice(0, k); }
+  const short = si => { let n = S[si][0]; if (pre.length && n.startsWith(pre.join(" ") + " ")) n = n.slice(pre.join(" ").length + 1); return n.replace(/ Fund$/, "").replace(/ - Growth.*$/, "") || S[si][0]; };
+  const topAum = bySch.filter(([, v]) => v.aum > 0).sort((a, b) => b[1].aum - a[1].aum).slice(0, 15);
+  document.getElementById("cap_ddtop").textContent = "Closing AUM, " + MM[st.asOf].full + " — top 15";
+  mk("c_ddtop", { data: { labels: topAum.map(([si]) => short(si)), datasets: [bar(topAum.map(([, v]) => v.aum), cssv("--s1"), { label: "AUM" })] }, options: hbarOpts(fmtCr) });
+  // concentration: top 8 schemes (by as-of AUM) as % of the AMC's AUM at each period-end, rest as Others
+  const top8s = topAum.slice(0, 8).map(([si]) => si), perEnd = ps.map(p => { const m = new Map(); let tot = 0; for (const r of rows){ if (r[1] !== p.end) continue; m.set(r[0], (m.get(r[0]) || 0) + r[3]); tot += r[3]; } return { m, tot }; });
+  const top5share = perEnd.map(({ m, tot }) => { const v = [...m.values()].sort((a, b) => b - a).slice(0, 5).reduce((a, b) => a + b, 0); return tot ? v / tot * 100 : null; });
+  document.getElementById("cap_ddconc").textContent = name + " \u00b7 " + tname + " \u00b7 % of AUM by scheme at each period-end (top 8 by current AUM, rest as Others) \u00b7 top-5 schemes now " + (top5share.slice(-1)[0] == null ? "\u00b7" : top5share.slice(-1)[0].toFixed(0) + "% of AUM");
+  const concDs = top8s.map((si, k) => bar(perEnd.map(({ m, tot }) => tot && m.has(si) ? m.get(si) / tot * 100 : null), SLOTS()[k], { label: short(si), borderRadius: 2 }));
+  concDs.push(bar(perEnd.map(({ m, tot }) => { if (!tot) return null; let o = tot; top8s.forEach(si => { o -= m.get(si) || 0; }); return o / tot * 100; }), cssv("--other"), { label: "Others", borderRadius: 2 }));
+  mk("c_ddconc", { data: { labels, datasets: concDs }, _fmt: v => v == null ? "\u2014" : v.toFixed(1) + "%",
+    options: baseOpts({ plugins: { legend: { display: true }, tooltip: { callbacks: { label: c => " " + c.dataset.label + "  " + (c.parsed.y == null ? "\u2014" : c.parsed.y.toFixed(1) + "%") } } },
+      scales: { x: Object.assign(baseOpts().scales.x, { stacked: true }), y: Object.assign(baseOpts().scales.y, { stacked: true, max: 100, ticks: { color: cssv("--muted"), font: { size: 11 }, callback: v => v + "%" } }) } }) });
+  const ins = bySch.filter(([, v]) => v.flow > 0).sort((a, b) => b[1].flow - a[1].flow).slice(0, 10);
+  const outs = bySch.filter(([, v]) => v.flow < 0).sort((a, b) => a[1].flow - b[1].flow).slice(0, 10);
+  document.getElementById("cap_ddin").textContent = "Net inflow, " + lbl; document.getElementById("cap_ddout").textContent = "Net outflow, " + lbl;
+  mk("c_ddin", { data: { labels: ins.map(([si]) => short(si)), datasets: [bar(ins.map(([, v]) => v.flow), cssv("--pos"), { label: "Net flow" })] }, options: hbarOpts(fmtCr) });
+  mk("c_ddout", { data: { labels: outs.map(([si]) => short(si)), datasets: [bar(outs.map(([, v]) => v.flow), cssv("--neg"), { label: "Net flow" })] }, options: hbarOpts(fmtCr) });
+}
+
+// ── Data table ─────────────────────────────────────────────────────────────
+let sortKey = 4, sortDir = -1;
+function dataRows(){
+  const months = kpiMonths(), agg = aggBy(months, r => r[0]);
+  return [...agg.entries()].map(([si, v]) => [A[S[si][1]], S[si][0], C[S[si][2]].n, v.aum, v.flow, v.open ? v.flow / v.open * 100 : null]);
+}
+function renderData(){
+  const q = document.getElementById("q").value.trim().toLowerCase();
+  let rows = dataRows(); if (q) rows = rows.filter(r => (r[0] + " " + r[1] + " " + r[2]).toLowerCase().includes(q));
+  rows.sort((a, b) => { const x = a[sortKey], y = b[sortKey]; if (typeof x === "string") return sortDir * x.localeCompare(y); return sortDir * ((x ?? -1e18) - (y ?? -1e18)); });
+  const head = ["AMC", "Scheme", "Category", "AUM ₹ Cr (" + MM[st.asOf].lbl + ")", "Net flow ₹ Cr (" + kpiLabel() + ")", "Flow / opening AUM %"];
+  const th = document.querySelector("#dataTbl thead"), tr = document.createElement("tr");
+  head.forEach((h, i) => { const c = document.createElement("th"); c.className = "sortable"; c.textContent = h + (sortKey === i ? (sortDir < 0 ? " ▼" : " ▲") : ""); c.onclick = () => { if (sortKey === i) sortDir *= -1; else { sortKey = i; sortDir = i < 3 ? 1 : -1; } renderData(); }; tr.appendChild(c); });
+  th.replaceChildren(tr);
+  const tb = document.querySelector("#dataTbl tbody"), frag = document.createDocumentFragment();
+  rows.forEach(r => { const row = document.createElement("tr"); r.forEach((v, i) => { const c = document.createElement("td");
+    if (i < 3) c.textContent = v; else if (i === 5) { c.textContent = fmtPct(v); c.className = v > 0 ? "p" : v < 0 ? "n" : ""; }
+    else { c.textContent = fmtNum(v); if (i === 4) c.className = v > 0 ? "p" : v < 0 ? "n" : ""; } row.appendChild(c); }); frag.appendChild(row); });
+  tb.replaceChildren(frag);
+  document.getElementById("dataCount").textContent = rows.length + " schemes";
+  renderTimeSeries();
+  document.getElementById("csvBtn").onclick = () => {
+    const esc = v => '"' + String(v ?? "").replace(/"/g, '""') + '"';
+    const csv = [head.map(esc).join(",")].concat(rows.map(r => r.map((v, i) => i < 3 ? esc(v) : (v == null ? "" : (i === 5 ? v.toFixed(2) : v.toFixed(1)))).join(","))).join("\n");
+    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" })); a.download = "mf_flows_" + M[st.asOf] + ".csv"; a.click();
+  };
+}
+
+// ── period time series (Data tab): one row per period, for the industry or one AMC ──
+const tst = { ent: "__IND__" };
+function renderTimeSeries(){
+  const sel = document.getElementById("tsEnt");
+  if (!sel.options.length){ sel.replaceChildren(...[["__IND__", "Industry"]].concat(A.map((n, i) => [String(i), n])).map(([v, n]) => { const o = document.createElement("option"); o.value = v; o.textContent = n; return o; })); sel.onchange = e => { tst.ent = e.target.value; renderTimeSeries(); }; }
+  sel.value = tst.ent;
+  const rows = tst.ent === "__IND__" ? ROWS : ROWS.filter(r => S[r[0]][1] === +tst.ent);
+  const agg = monthAgg(rows), ps = tsPeriods();
+  const cats = catRank.filter(ci => (st.cat === "All" || C[ci].g === st.cat) && !(st.exArb && ci === ARB));
+  const catM = new Map(cats.map(ci => [ci, new Float64Array(NM)]));
+  for (const r of rows){ const a = catM.get(S[r[0]][2]); if (a) a[r[1]] += r[2]; }
+  const need = st.period === "Q" ? 3 : st.period === "FY" ? 12 : 1;
+  const head = ["Period", "Period end", "Months", "Net inflow (\u20b9 Cr)", "Opening AUM (\u20b9 Cr)", "Closing AUM (\u20b9 Cr)", "Mark-to-market (\u20b9 Cr)", "NFOs & scheme changes (\u20b9 Cr)", "Inflow % of opening", "AUM growth YoY %"].concat(cats.map(ci => "Net inflow: " + C[ci].n + " (\u20b9 Cr)"));
+  const data = ps.map(p => { const e = p.end, s0 = p.months[0], close = agg[e].aum, open = s0 > 0 && agg[s0 - 1].aum ? agg[s0 - 1].aum : agg[s0].open;
+    const flow = p.months.reduce((x, m) => x + agg[m].flow, 0), mtm = p.months.reduce((x, m) => x + agg[m].mtm, 0);
+    const jY = M.findIndex((x, i) => MM[i].y === MM[e].y - 1 && MM[i].mo === MM[e].mo);
+    return [p.lbl + (p.months.length < need ? " (partial)" : ""), M[e], p.months.length, flow, open, close, mtm, close - open - flow - mtm, open ? flow / open * 100 : null, jY >= 0 && agg[jY].aum ? (close / agg[jY].aum - 1) * 100 : null]
+      .concat(cats.map(ci => p.months.reduce((x, m) => x + catM.get(ci)[m], 0))); });
+  document.getElementById("cap_ts").textContent = (tst.ent === "__IND__" ? "Industry" : A[+tst.ent]) + " \u00b7 " + ({ M: "monthly", Q: "quarterly", FY: "financial-year", YTD: "monthly, FY to date" })[st.period] + " \u00b7 " + ps.length + " periods in the selected range \u00b7 " + (st.cat === "All" ? "equity + hybrid" : st.cat.toLowerCase()) + (st.exArb ? ", excluding arbitrage" : ", including arbitrage") + " \u00b7 opening AUM = previous period close";
+  const t = document.createElement("table"); t.className = "fin-tbl"; t.style.width = (150 + (head.length - 1) * 110) + "px";
+  const th = document.createElement("thead"), tr = document.createElement("tr"); head.forEach(h => { const c = document.createElement("th"); c.textContent = h; c.style.whiteSpace = "normal"; tr.appendChild(c); }); th.appendChild(tr); t.appendChild(th);
+  const tb = document.createElement("tbody");
+  data.forEach(r => { const row = document.createElement("tr"); r.forEach((v, i) => { const c = document.createElement("td"); c.textContent = i < 2 ? v : i === 2 ? String(v) : (i === 8 || i === 9) ? (v == null ? "\u00b7" : (v > 0 ? "+" : "") + v.toFixed(1) + "%") : fmtNum(v); if (typeof v === "number" && v < 0 && i > 2) c.className = "neg"; row.appendChild(c); }); tb.appendChild(row); });
+  t.appendChild(tb); document.getElementById("tsTbl").replaceChildren(t);
+  document.getElementById("tsCsv").onclick = () => { const esc = v => '"' + String(v ?? "").replace(/"/g, '""') + '"';
+    const csv = [head.map(esc).join(",")].concat(data.map(r => r.map((v, i) => i < 2 ? esc(v) : v == null ? "" : typeof v === "number" ? (i === 2 ? v : v.toFixed(i >= 8 && i <= 9 ? 2 : 1)) : esc(v)).join(","))).join("\n");
+    const a = document.createElement("a"); a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv" })); a.download = "mf_flows_timeseries_" + (tst.ent === "__IND__" ? "industry" : A[+tst.ent].replace(/\W+/g, "_")) + "_" + st.period + ".csv"; a.click(); };
+}
+
+// ── controls ───────────────────────────────────────────────────────────────
+function fillAsOf(){
+  const sel = document.getElementById("asOf"), cur = st.asOf;
+  sel.replaceChildren(...PERIODS.slice().reverse().map(p => { const o = document.createElement("option"); o.value = p.end; o.textContent = p.full; return o; }));
+  // snap as-of to a valid period end
+  const ends = PERIODS.map(p => p.end); if (!ends.includes(cur)) st.asOf = ends.filter(e => e <= cur).pop() ?? ends[ends.length-1];
+  sel.value = st.asOf;
+}
+function seg(id, key, after){ const el = document.getElementById(id); el.querySelectorAll("button").forEach(b => b.onclick = () => { el.querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); st[key] = isNaN(+b.dataset.v) ? b.dataset.v : +b.dataset.v; if (after) after(); renderAll(); }); }
+seg("periodSeg", "period", () => { PERIODS = buildPeriods(st.period); fillAsOf(); document.getElementById("rangeSeg").style.opacity = st.period === "YTD" ? .45 : 1; });
+seg("rangeSeg", "range"); seg("catSeg", "cat");
+document.getElementById("asOf").onchange = e => { st.asOf = +e.target.value; renderAll(); };
+document.getElementById("exArb").onchange = e => { st.exArb = e.target.checked; renderAll(); };
+document.getElementById("nav").querySelectorAll("button").forEach(b => b.onclick = () => { st.tab = b.dataset.v; document.querySelectorAll("#nav button").forEach(x => x.classList.toggle("on", x === b)); document.querySelectorAll(".view").forEach(v => v.classList.toggle("on", v.id === "v-" + st.tab)); renderAll(); });
+document.getElementById("q").oninput = () => renderData();
+(function(){ const a = document.getElementById("ddAmc"); a.replaceChildren(...A.map((n, i) => { const o = document.createElement("option"); o.value = i; o.textContent = n; return o; })); a.onchange = e => { st.amc = +e.target.value; renderDD(); };
+  const t = document.getElementById("ddType"); const opts = [["All", "All scheme types"]].concat(C.map((c, i) => [i, c.n + " (" + c.g + ")"])); t.replaceChildren(...opts.map(([v, n]) => { const o = document.createElement("option"); o.value = v; o.textContent = n; return o; })); t.onchange = e => { st.type = e.target.value; renderDD(); }; })();
+
+// ── AUM bridge (flows vs mark-to-market between two month-ends) ────────────
+const IDX = /*__IDX__*/null;
+const IND = "__IND__";
+const bst = { ents: [IND], s: null, e: null, mon: IND };
+function brInit(){ if (bst.s == null){ const i = M.findIndex(m => m.startsWith("2024-09")); bst.s = i >= 0 ? i : Math.max(0, NM - 24); bst.e = NM - 1; } }
+const entName = ent => ent === IND ? "Industry" : A[+ent];
+const entColor = (ent, k) => SLOTS()[k % 8];
+function brEntityRows(ent){ return ent === IND ? ROWS : ROWS.filter(r => S[r[0]][1] === +ent); }
+function brCompute(ent){
+  const s = bst.s, e = bst.e; let a0 = 0, a1 = 0, fl = 0, mtm = 0;
+  const mPrev = new Float64Array(NM), mExp = new Float64Array(NM), mFl = new Float64Array(NM), mMtm = new Float64Array(NM);
+  for (const r of brEntityRows(ent)){ const m = r[1];
+    if (m === s) a0 += r[3];
+    if (m === e) a1 += r[3];
+    if (m > s && m <= e){ const x = r[4] * (r[5] - 1); fl += r[2]; mtm += x; mPrev[m] += r[4]; mExp[m] += r[4] * r[5]; mFl[m] += r[2]; mMtm[m] += x; } }
+  let chain = 1; const navIdx = [100];
+  for (let m = s + 1; m <= e; m++){ chain *= mPrev[m] ? mExp[m] / mPrev[m] : 1; navIdx.push(chain * 100); }
+  return { a0, a1, d: a1 - a0, fl, mtm, res: a1 - a0 - fl - mtm, chain: (chain - 1) * 100, navIdx, mFl, mMtm };
+}
+function idxSeries(name){ const ser = IDX && IDX.series && IDX.series[name]; if (!ser) return null; const out = []; for (let m = bst.s; m <= bst.e; m++){ const v = ser[M[m].slice(0, 7)]; out.push(v ? v[1] : null); } return out; }
+function renderBridge(){
+  brInit();
+  // controls
+  const chips = document.getElementById("brChips"); chips.replaceChildren(...bst.ents.map((ent, k) => { const b = document.createElement("button"); b.className = "chip"; b.style.borderColor = entColor(ent, k); b.textContent = entName(ent); if (bst.ents.length > 1){ const x = document.createElement("span"); x.className = "x"; x.textContent = "×"; b.appendChild(x); } b.onclick = () => { if (bst.ents.length > 1){ bst.ents = bst.ents.filter(z => z !== ent); if (bst.mon === ent) bst.mon = bst.ents[0]; renderBridge(); } }; return b; }));
+  const add = document.getElementById("brAdd"); const opts = [["", "Add AMC…"]].concat(bst.ents.includes(IND) ? [] : [[IND, "Industry"]]).concat(A.map((n, i) => [String(i), n]).filter(([v]) => !bst.ents.includes(v)));
+  add.replaceChildren(...opts.map(([v, n]) => { const o = document.createElement("option"); o.value = v; o.textContent = n; return o; })); add.value = "";
+  const mkSel = (id, val) => { const el = document.getElementById(id); el.replaceChildren(...M.map((m, i) => { const o = document.createElement("option"); o.value = i; o.textContent = MM[i].full; return o; })); el.value = val; };
+  mkSel("brS", bst.s); mkSel("brE", bst.e);
+  const monSel = document.getElementById("brMon"); monSel.replaceChildren(...bst.ents.map(ent => { const o = document.createElement("option"); o.value = ent; o.textContent = entName(ent); return o; })); if (!bst.ents.includes(bst.mon)) bst.mon = bst.ents[0]; monSel.value = bst.mon;
+  const nMon = bst.e - bst.s, s = bst.s, e = bst.e;
+  document.getElementById("brNote").textContent = "Change in AUM between " + MM[s].full + " and " + MM[e].full + " (" + nMon + " months) split into net inflows into existing schemes, NFOs and scheme changes (the part the monthly flow calculation cannot see: first-month NFO collections, renames, mergers), and mark-to-market (opening AUM × NAV return, summed monthly). Category and arbitrage filters above apply. NAV return is the AUM-weighted monthly NAV return chained over the window — the like-for-like comparison with the index returns.";
+  // table
+  const res = bst.ents.map(ent => Object.assign({ ent }, brCompute(ent)));
+  const t = document.createElement("table"); t.className = "fin-tbl"; t.style.width = "100%";
+  const th = document.createElement("thead"), tr = document.createElement("tr");
+  ["", "AUM " + MM[s].lbl + " (₹ Cr)", "AUM " + MM[e].lbl + " (₹ Cr)", "Change (₹ Cr)", "Growth %", "Net inflows (₹ Cr)", "NFOs & scheme changes (₹ Cr)", "Mark-to-market (₹ Cr)", "Inflows % of opening", "NFO % of opening", "MTM % of opening", "Inflows share of AUM growth", "NFO share of AUM growth", "MTM share of AUM growth", "NAV return, chained %"].forEach(h => { const c = document.createElement("th"); c.textContent = h; c.style.whiteSpace = "normal"; tr.appendChild(c); });
+  th.appendChild(tr); t.appendChild(th); const tb = document.createElement("tbody");
+  const pct = v => (v > 0 ? "+" : "") + v.toFixed(1) + "%";
+  const sh = (v, d) => Math.abs(d) < 1 ? "·" : (v / d * 100).toFixed(0) + "%";      // share of the AUM change
+  res.forEach((r, k) => { const row = document.createElement("tr"); if (r.ent === IND) row.className = "tot";
+    const cells = [entName(r.ent), fmtNum(r.a0), fmtNum(r.a1), fmtNum(r.d), r.a0 ? pct(r.d / r.a0 * 100) : "·", fmtNum(r.fl), fmtNum(r.res), fmtNum(r.mtm), r.a0 ? pct(r.fl / r.a0 * 100) : "·", r.a0 ? pct(r.res / r.a0 * 100) : "·", r.a0 ? pct(r.mtm / r.a0 * 100) : "·", sh(r.fl, r.d), sh(r.res, r.d), sh(r.mtm, r.d), pct(r.chain)];
+    cells.forEach((v, i) => { const c = document.createElement("td"); c.textContent = v; if (i === 0){ c.style.color = entColor(r.ent, k); c.style.fontWeight = "600"; } else if (typeof v === "string" && v.startsWith("-")) c.className = "neg"; row.appendChild(c); }); tb.appendChild(row); });
+  // index reference rows
+  const idxNames = IDX && IDX.series ? Object.keys(IDX.series) : [];
+  const idxRet = idxNames.map(n => { const a = IDX.series[n][M[s].slice(0, 7)], b = IDX.series[n][M[e].slice(0, 7)]; return [n, a && b ? (b[1] / a[1] - 1) * 100 : null]; });
+  if (idxRet.length){ const sec = document.createElement("tr"); sec.className = "sec"; const td = document.createElement("td"); td.colSpan = 15; td.textContent = "Reference: index price returns over the same window (Yahoo Finance, month-end closes" + (IDX.fetched ? ", fetched " + IDX.fetched : "") + ")"; sec.appendChild(td); tb.appendChild(sec);
+    idxRet.forEach(([n, v]) => { const row = document.createElement("tr"); const a = document.createElement("td"); a.textContent = n; a.className = "ind1"; row.appendChild(a); for (let i = 1; i < 15; i++){ const c = document.createElement("td"); c.textContent = i === 14 ? (v == null ? "·" : pct(v)) : ""; if (v != null && v < 0 && i === 14) c.className = "neg"; row.appendChild(c); } tb.appendChild(row); }); }
+  t.appendChild(tb); document.getElementById("brTbl").replaceChildren(t);
+  document.getElementById("cap_brTbl").textContent = MM[s].full + " → " + MM[e].full + " · ₹ Cr · " + (st.cat === "All" ? "equity + hybrid" : st.cat.toLowerCase()) + (st.exArb ? ", excluding arbitrage" : ", including arbitrage");
+  // composition chart (% of opening AUM, stacked)
+  const names = res.map(r => entName(r.ent)), p = (r, v) => r.a0 ? v / r.a0 * 100 : null;
+  mk("c_brComp", { data: { labels: names, datasets: [bar(res.map(r => p(r, r.fl)), cssv("--s1"), { label: "Net inflows" }), bar(res.map(r => p(r, r.res)), cssv("--s4"), { label: "NFOs & scheme changes" }), bar(res.map(r => p(r, r.mtm)), cssv("--s3"), { label: "Mark-to-market" })] }, _fmt: v => v == null ? "—" : v.toFixed(1) + "%",
+    options: baseOpts({ indexAxis: "y", interaction: { mode: "index", axis: "y", intersect: false }, plugins: { legend: { display: true }, tooltip: { callbacks: { label: c => { const r = res[c.dataIndex], v = [r.fl, r.res, r.mtm][c.datasetIndex]; return " " + c.dataset.label + "  " + pct(c.parsed.x) + " of opening AUM · " + sh(v, r.d) + " of growth"; }, footer: items => "AUM growth " + pct(items.reduce((a, i) => a + i.parsed.x, 0)) } } },
+      scales: { x: { stacked: true, grid: { color: cssv("--grid") }, border: { display: false }, ticks: { color: cssv("--muted"), font: { size: 11 }, callback: v => v + "%" } }, y: { stacked: true, grid: { display: false }, border: { color: cssv("--axis") }, ticks: { color: cssv("--text2"), font: { size: 11 } } } } }) });
+  // NAV index vs market indices
+  const labels = []; for (let m = s; m <= e; m++) labels.push(MM[m].lbl);
+  const ds = res.map((r, k) => line(r.navIdx, entColor(r.ent, k), { label: entName(r.ent) + " (NAV)" }));
+  idxNames.forEach((n, k) => { const ser = idxSeries(n); if (!ser || ser[0] == null) return; ds.push(line(ser.map(v => v == null ? null : v / ser[0] * 100), cssv("--muted"), { label: n, borderDash: [k % 2 ? 2 : 5, 3], borderWidth: 1.5 })); });
+  mk("c_brNav", { data: { labels, datasets: ds }, _fmt: v => v == null ? "—" : v.toFixed(1),
+    options: baseOpts({ plugins: { legend: { display: true }, tooltip: { callbacks: { label: c => " " + c.dataset.label + "  " + (c.parsed.y == null ? "—" : c.parsed.y.toFixed(1)) } } }, scales: { x: baseOpts().scales.x, y: baseOpts().scales.y } }) });
+  // monthly bridge for one entity
+  const mr = res.find(r => r.ent === bst.mon) || res[0]; document.getElementById("brMonName").textContent = entName(mr.ent);
+  const ml = [], mf = [], mm = []; for (let m = s + 1; m <= e; m++){ ml.push(MM[m].lbl); mf.push(mr.mFl[m]); mm.push(mr.mMtm[m]); }
+  mk("c_brMonthly", { data: { labels: ml, datasets: [bar(mf, cssv("--s1"), { label: "Net inflows", borderRadius: 2 }), bar(mm, cssv("--s3"), { label: "Mark-to-market", borderRadius: 2 })] },
+    options: baseOpts({ plugins: { legend: { display: true }, tooltip: { callbacks: { label: c => " " + c.dataset.label + "  " + fmtCr(c.parsed.y) } } },
+      scales: { x: Object.assign(baseOpts().scales.x, { stacked: true }), y: Object.assign(baseOpts().scales.y, { stacked: true, ticks: { color: cssv("--muted"), font: { size: 11 }, callback: axisCr } }) } }) });
+}
+document.getElementById("brAdd").onchange = e => { if (e.target.value !== ""){ bst.ents.push(e.target.value); renderBridge(); } };
+document.getElementById("brS").onchange = e => { bst.s = +e.target.value; if (bst.s >= bst.e) bst.e = Math.min(NM - 1, bst.s + 1); renderBridge(); };
+document.getElementById("brE").onchange = e => { bst.e = +e.target.value; if (bst.e <= bst.s) bst.s = Math.max(0, bst.e - 1); renderBridge(); };
+document.getElementById("brMon").onchange = e => { bst.mon = e.target.value; renderBridge(); };
+
+// ── Performance (trailing returns, category quartiles, benchmark-relative) ──
+const PF = D.perf || [];
+const pst = { h: 3, amc: null, cat: null };
+const MIN_PEERS = 8;
+const HCOL = { 1: [2, 5], 3: [3, 6], 5: [4, 7] };            // column of return / benchmark in PF rows
+let pfByMonth = null;                                        // monthIdx -> PF rows (built once)
+function pfIndex(){ if (pfByMonth) return pfByMonth; pfByMonth = Array.from({length: NM}, () => []); for (const r of PF) pfByMonth[r[1]].push(r); return pfByMonth; }
+const pfCache = new Map();
+// per month & horizon: Map schemeIdx -> {r, b, aum, pct, q, N}, honouring the global category/arbitrage filter
+function perfMonth(m){
+  const key = m + "|" + pst.h + "|" + st.cat + "|" + st.exArb; if (pfCache.has(key)) return pfCache.get(key);
+  const [ri, bi] = HCOL[pst.h], out = new Map(), groups = new Map();
+  for (const r of pfIndex()[m]){ if (!schemeOK(r[0]) || r[ri] == null) continue; const o = { r: r[ri], b: r[bi], aum: r[8], pct: null, q: null, N: 0 }; out.set(r[0], o); const c = S[r[0]][2]; if (!groups.has(c)) groups.set(c, []); groups.get(c).push(o); }
+  for (const arr of groups.values()){ arr.sort((a, b) => b.r - a.r); const N = arr.length; arr.forEach((o, i) => { o.N = N; o.pct = (i + 0.5) / N * 100; o.q = N >= MIN_PEERS ? Math.min(4, Math.floor(i / N * 4) + 1) : null; }); }
+  pfCache.set(key, out); return out;
+}
+// AMC (or all) aggregate at month m
+function perfAgg(m, ai){
+  const pm = perfMonth(m); let q = [0, 0, 0, 0], qa = 0, wa = 0, wp = 0, wb = 0, beat = 0, alpha = 0, n = 0;
+  for (const [si, o] of pm){ if (ai != null && S[si][1] !== ai) continue; n++; const w = o.aum || 0; wa += w; wp += w * o.pct; if (o.q){ q[o.q - 1] += w; qa += w; } if (o.b != null){ wb += w; alpha += w * (o.r - o.b); if (o.r > o.b) beat += w; } }
+  return { n, aum: wa, q: q.map(x => qa ? x / qa * 100 : null), top: qa ? (q[0] + q[1]) / qa * 100 : null, pct: wa ? wp / wa : null, beat: wb ? beat / wb * 100 : null, alpha: wb ? alpha / wb : null };
+}
+const QCOL = () => [cssv("--seq6"), cssv("--seq4"), cssv("--seq2"), cssv("--seq1")];
+function renderPerf(){
+  const hasPF = PF.length > 0;
+  if (!hasPF){ document.getElementById("pfNote").textContent = "Trailing-return data not built yet — run pipeline_multi.py --returns-backfill, then build_dashboard.py."; return; }
+  const sel = document.getElementById("pfAmc");
+  if (pst.amc == null) pst.amc = 0;
+  sel.replaceChildren(...A.map((n, i) => { const o = document.createElement("option"); o.value = i; o.textContent = n; return o; })); sel.value = pst.amc;
+  const ai = +pst.amc, name = A[ai], hl = pst.h + "-year";
+  document.getElementById("pfAmcName").textContent = name; document.getElementById("pfAmcName2").textContent = name;
+  document.getElementById("pfNote").textContent = "Each month every scheme is ranked within its AMFI sub-category on its trailing " + hl + " regular-plan return (AMFI-CRISIL data) and placed in a quartile (Q1 = top). An AMC's AUM is then split by the quartile its schemes sit in. Benchmark measures use each scheme's own benchmark TRI as reported by AMFI. Category and arbitrage filters above apply; sub-categories with fewer than " + MIN_PEERS + " schemes are ranked but not bucketed into quartiles.";
+  const ps = tsPeriods(), labels = ps.map(p => p.lbl), ends = ps.map(p => p.end);
+  const agA = ends.map(m => perfAgg(m, ai)), agI = ends.map(m => perfAgg(m, null));
+  // quartile mix
+  document.getElementById("cap_pfMix").textContent = "% of " + name + "'s AUM in schemes ranked Q1 to Q4 on trailing " + hl + " returns, at each period-end";
+  mk("c_pfMix", { data: { labels, datasets: [0, 1, 2, 3].map(k => bar(agA.map(a => a.q[k]), QCOL()[k], { label: "Q" + (k + 1) + (k === 0 ? " (top)" : k === 3 ? " (bottom)" : ""), borderRadius: 2 })) }, _fmt: v => v == null ? "—" : v.toFixed(1) + "%",
+    options: baseOpts({ plugins: { legend: { display: true }, tooltip: { callbacks: { label: c => " " + c.dataset.label + "  " + (c.parsed.y == null ? "—" : c.parsed.y.toFixed(1) + "%") } } },
+      scales: { x: Object.assign(baseOpts().scales.x, { stacked: true }), y: Object.assign(baseOpts().scales.y, { stacked: true, max: 100, ticks: { color: cssv("--muted"), font: { size: 11 }, callback: v => v + "%" } }) } }) });
+  const two = (id, key, suffix, dec) => mk(id, { data: { labels, datasets: [line(agA.map(a => a[key]), coColorFor(ai), { label: name }), line(agI.map(a => a[key]), cssv("--muted"), { label: "Industry", borderDash: [5, 3] })] }, _fmt: v => v == null ? "—" : v.toFixed(dec) + suffix,
+    options: baseOpts({ plugins: { legend: { display: true }, tooltip: { callbacks: { label: c => " " + c.dataset.label + "  " + (c.parsed.y == null ? "—" : c.parsed.y.toFixed(dec) + suffix) } } }, scales: { x: baseOpts().scales.x, y: Object.assign(baseOpts().scales.y, { ticks: { color: cssv("--muted"), font: { size: 11 }, callback: v => v + suffix } }) } }) });
+  document.getElementById("cap_pfTop").textContent = "% of AUM in Q1 + Q2 schemes on trailing " + hl + " returns, " + name + " vs industry (industry is AUM-weighted, so it need not be 50%)";
+  two("c_pfTop", "top", "%", 0);
+  document.getElementById("cap_pfBeat").textContent = "% of AUM in schemes whose trailing " + hl + " return exceeds their own benchmark, " + name + " vs industry";
+  two("c_pfBeat", "beat", "%", 0);
+  document.getElementById("cap_pfAlpha").textContent = "AUM-weighted (scheme return − benchmark return), percentage points p.a. over " + hl;
+  two("c_pfAlpha", "alpha", " pp", 1);
+  // scorecard at as-of month
+  const m = st.asOf, rows = A.map((n, i) => Object.assign({ name: n, i }, perfAgg(m, i))).filter(x => x.n).sort((a, b) => b.aum - a.aum).slice(0, 20).sort((a, b) => (b.top ?? -1) - (a.top ?? -1));
+  rows.push(Object.assign({ name: "Industry", i: -1 }, perfAgg(m, null)));
+  document.getElementById("cap_pfScore").textContent = MM[m].full + " · trailing " + hl + " · top 20 AMCs by equity + hybrid AUM, sorted by share of AUM in the top half";
+  const t = document.createElement("table"); t.className = "fin-tbl"; t.style.width = "100%";
+  const th = document.createElement("thead"), tr = document.createElement("tr");
+  ["AMC", "Schemes ranked", "AUM ranked (₹ Cr)", "Q1 %", "Q2 %", "Q3 %", "Q4 %", "Top-half %", "AUM-wtd percentile", "AUM beating benchmark %", "AUM-wtd alpha (pp)"].forEach(h => { const c = document.createElement("th"); c.textContent = h; c.style.whiteSpace = "normal"; tr.appendChild(c); }); th.appendChild(tr); t.appendChild(th);
+  const tb = document.createElement("tbody"), f1 = v => v == null ? "·" : v.toFixed(1), f0 = v => v == null ? "·" : v.toFixed(0);
+  rows.forEach(r => { const row = document.createElement("tr"); if (r.i < 0) row.className = "tot";
+    [r.name, String(r.n), fmtNum(r.aum), f0(r.q[0]), f0(r.q[1]), f0(r.q[2]), f0(r.q[3]), f0(r.top), f0(r.pct), f0(r.beat), (r.alpha != null && r.alpha > 0 ? "+" : "") + f1(r.alpha)].forEach((v, k) => { const c = document.createElement("td"); c.textContent = v; if (k === 0 && r.i >= 0) c.style.fontWeight = "600"; if (k === 10 && r.alpha != null) c.className = r.alpha < 0 ? "neg" : "pos"; row.appendChild(c); }); tb.appendChild(row); });
+  t.appendChild(tb); document.getElementById("pfScore").replaceChildren(t);
+  // heatmap: top 15 AMCs × periods, top-half share
+  const top15 = A.map((n, i) => ({ i, aum: perfAgg(m, i).aum })).filter(x => x.aum).sort((a, b) => b.aum - a.aum).slice(0, 15).map(x => x.i);
+  document.getElementById("cap_pfHeat").textContent = "% of AUM in Q1 + Q2 on trailing " + hl + " returns; darker = more of the book in the top half";
+  const ht = document.createElement("table"), hth = document.createElement("thead"), htr = document.createElement("tr"); htr.appendChild(document.createElement("th")); labels.forEach(l => { const c = document.createElement("th"); c.textContent = l; htr.appendChild(c); }); hth.appendChild(htr);
+  const htb = document.createElement("tbody"), dark = document.documentElement.getAttribute("data-theme") === "dark";
+  top15.forEach(i => { const row = document.createElement("tr"); const h = document.createElement("td"); h.textContent = A[i]; row.appendChild(h);
+    ends.forEach(e => { const v = perfAgg(e, i).top, c = document.createElement("td"); c.textContent = v == null ? "·" : v.toFixed(0); if (v != null){ c.style.background = `color-mix(in oklab, ${cssv("--s1")} ${Math.round(6 + Math.max(0, Math.min(1, v / 100)) * (dark ? 70 : 60))}%, ${cssv("--card")})`; c.style.color = v > 55 ? "#fff" : cssv("--text"); } row.appendChild(c); }); htb.appendChild(row); });
+  ht.append(hth, htb); document.getElementById("pfHeat").replaceChildren(ht);
+  // scheme table for the selected AMC at as-of
+  const pm = perfMonth(m), sch = [...pm.entries()].filter(([si]) => S[si][1] === ai).sort((a, b) => b[1].aum - a[1].aum);
+  document.getElementById("cap_pfSch").textContent = MM[m].full + " · trailing " + hl + " returns, % p.a. · rank within AMFI sub-category (1 = best)";
+  const s2 = document.createElement("table"); s2.className = "fin-tbl"; s2.style.width = "100%";
+  const sh = document.createElement("thead"), str = document.createElement("tr");
+  ["Scheme", "Category", "AUM (₹ Cr)", "Return %", "Benchmark", "Benchmark %", "Alpha (pp)", "Rank / N", "Quartile"].forEach(h => { const c = document.createElement("th"); c.textContent = h; str.appendChild(c); }); sh.appendChild(str); s2.appendChild(sh);
+  const sb = document.createElement("tbody");
+  sch.forEach(([si, o]) => { const row = document.createElement("tr"); const rank = Math.round(o.pct / 100 * o.N + 0.5);
+    [S[si][0], C[S[si][2]].n, fmtNum(o.aum), o.r.toFixed(1), S[si][3] || "·", o.b == null ? "·" : o.b.toFixed(1), o.b == null ? "·" : (o.r - o.b > 0 ? "+" : "") + (o.r - o.b).toFixed(1), rank + " / " + o.N, o.q ? "Q" + o.q : "·"].forEach((v, k) => { const c = document.createElement("td"); c.textContent = v; if (k === 6 && o.b != null) c.className = o.r - o.b < 0 ? "neg" : "pos"; if (k === 8 && o.q){ c.style.fontWeight = "600"; c.style.color = o.q <= 2 ? cssv("--good") : o.q === 4 ? cssv("--bad") : cssv("--text2"); } row.appendChild(c); }); sb.appendChild(row); });
+  s2.appendChild(sb); document.getElementById("pfSch").replaceChildren(s2);
+  renderPerfCategory(ps, labels, ends);
+}
+function renderPerfCategory(ps, labels, ends){
+  const m = st.asOf, sel = document.getElementById("pfCat");
+  const cats = C.map((c, i) => i).filter(i => (st.cat === "All" || C[i].g === st.cat) && !(st.exArb && i === ARB)).sort((a, b) => C[a].n.localeCompare(C[b].n));
+  if (pst.cat == null || !cats.includes(pst.cat)) pst.cat = cats.includes(catRank[0]) ? catRank[0] : cats[0];
+  sel.replaceChildren(...cats.map(i => { const o = document.createElement("option"); o.value = i; o.textContent = C[i].n + " (" + C[i].g + ")"; return o; })); sel.value = pst.cat;
+  const ci = pst.cat, cname = C[ci].n, ai = +pst.amc, hl = pst.h + "-year";
+  document.getElementById("pfCatName").textContent = cname; document.getElementById("pfCatName2").textContent = cname;
+  // peer table at as-of
+  const pm = perfMonth(m), peers = [...pm.entries()].filter(([si]) => S[si][2] === ci).sort((a, b) => b[1].r - a[1].r);
+  const tot = peers.reduce((x, [, o]) => x + (o.aum || 0), 0);
+  document.getElementById("cap_pfCat").textContent = MM[m].full + " \u00b7 " + peers.length + " schemes ranked on trailing " + hl + " return \u00b7 " + A[ai] + " highlighted" + (peers.length && peers.length < MIN_PEERS ? " \u00b7 fewer than " + MIN_PEERS + " schemes, so no quartiles" : "");
+  const t = document.createElement("table"); t.className = "fin-tbl"; t.style.width = "100%";
+  const th = document.createElement("thead"), tr = document.createElement("tr");
+  ["#", "Scheme", "AMC", "AUM (\u20b9 Cr)", "% of category AUM", "Return %", "Benchmark %", "Alpha (pp)", "Quartile"].forEach(h => { const c = document.createElement("th"); c.textContent = h; tr.appendChild(c); }); th.appendChild(tr); t.appendChild(th);
+  const tb = document.createElement("tbody");
+  peers.forEach(([si, o], i) => { const row = document.createElement("tr"); const mine = S[si][1] === ai; if (mine) row.style.background = "color-mix(in oklab, " + coColorFor(ai) + " 12%, " + cssv("--card") + ")";
+    [String(i + 1), S[si][0], A[S[si][1]], fmtNum(o.aum), tot ? (o.aum / tot * 100).toFixed(1) + "%" : "\u00b7", o.r.toFixed(1), o.b == null ? "\u00b7" : o.b.toFixed(1), o.b == null ? "\u00b7" : (o.r - o.b > 0 ? "+" : "") + (o.r - o.b).toFixed(1), o.q ? "Q" + o.q : "\u00b7"].forEach((v, k) => { const c = document.createElement("td"); c.textContent = v; if (k === 1 && mine) c.style.fontWeight = "700"; if (k === 7 && o.b != null) c.className = o.r - o.b < 0 ? "neg" : "pos"; if (k === 8 && o.q){ c.style.fontWeight = "600"; c.style.color = o.q <= 2 ? cssv("--good") : o.q === 4 ? cssv("--bad") : cssv("--text2"); } row.appendChild(c); }); tb.appendChild(row); });
+  t.appendChild(tb); document.getElementById("pfCatTbl").replaceChildren(t);
+  // category AUM by quartile over time
+  document.getElementById("cap_pfCatMix").textContent = "% of the category's AUM held in Q1 to Q4 schemes on trailing " + hl + " returns \u2014 above 25% in Q1 means money sits with recent winners";
+  const mix = ends.map(e => { const q = [0, 0, 0, 0]; let qa = 0; for (const [si, o] of perfMonth(e)){ if (S[si][2] !== ci || !o.q) continue; q[o.q - 1] += o.aum || 0; qa += o.aum || 0; } return q.map(x => qa ? x / qa * 100 : null); });
+  mk("c_pfCatMix", { data: { labels, datasets: [0, 1, 2, 3].map(k => bar(mix.map(v => v[k]), QCOL()[k], { label: "Q" + (k + 1) + (k === 0 ? " (top)" : k === 3 ? " (bottom)" : ""), borderRadius: 2 })) }, _fmt: v => v == null ? "\u2014" : v.toFixed(1) + "%",
+    options: baseOpts({ plugins: { legend: { display: true }, tooltip: { callbacks: { label: c => " " + c.dataset.label + "  " + (c.parsed.y == null ? "\u2014" : c.parsed.y.toFixed(1) + "%") } } },
+      scales: { x: Object.assign(baseOpts().scales.x, { stacked: true }), y: Object.assign(baseOpts().scales.y, { stacked: true, max: 100, ticks: { color: cssv("--muted"), font: { size: 11 }, callback: v => v + "%" } }) } }) });
+}
+document.getElementById("pfCat").onchange = e => { pst.cat = +e.target.value; renderPerf(); };
+function coColorFor(ai){ return ai < 8 ? SLOTS()[ai] : cssv("--s7"); }
+(function(){ const el = document.getElementById("pfHor"); el.querySelectorAll("button").forEach(b => b.onclick = () => { el.querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); pst.h = +b.dataset.v; renderPerf(); }); })();
+document.getElementById("pfAmc").onchange = e => { pst.amc = +e.target.value; renderPerf(); };
+
+// ── Quarterly average AUM from DAILY data (pipeline_daily.py) ───────────────
+const DAILY = D.daily || null;
+const qst = { q: null, ent: "__IND__" };
+function qOf(dstr){ const y = +dstr.slice(0, 4), mo = +dstr.slice(5, 7); const fy = mo >= 4 ? y + 1 : y; const q = mo >= 4 && mo <= 6 ? 1 : mo >= 7 && mo <= 9 ? 2 : mo >= 10 ? 3 : 4; return { key: fy * 4 + q, lbl: "Q" + q + " FY" + String(fy % 100).padStart(2, "0"), fy, q }; }
+function dailyVal(ai, i){ const s = ai === "__IND__" ? null : DAILY.s[String(ai)]; if (ai === "__IND__"){ let t = 0; for (const k in DAILY.s){ const r = DAILY.s[k][i]; t += pick(r); } return t; } return s ? pick(s[i]) : 0; }
+function pick(r){ let v = 0; if (st.cat === "All" || st.cat === "Equity") v += r[0]; if (st.cat === "All" || st.cat === "Hybrid") v += r[1]; if (!st.exArb && st.cat !== "Equity") v += r[2]; return v; }
+function quarters(){ const m = new Map(); DAILY.d.forEach((d, i) => { const q = qOf(d); if (!m.has(q.key)) m.set(q.key, { key: q.key, lbl: q.lbl, idx: [], first: d, last: d }); const o = m.get(q.key); o.idx.push(i); o.last = d; }); return [...m.values()].sort((a, b) => a.key - b.key); }
+function qAvg(ai, qq){ if (!qq || !qq.idx.length) return null; let t = 0; for (const i of qq.idx) t += dailyVal(ai, i); return t / qq.idx.length; }
+function renderQaum(){
+  if (!DAILY){ document.getElementById("qaNote").textContent = "Daily AUM not sampled yet — run pipeline_daily.py, then build_dashboard.py."; return; }
+  const qs = quarters(), byKey = new Map(qs.map(q => [q.key, q]));
+  const complete = qs.filter(q => q.idx.length >= 40);
+  if (qst.q == null || !byKey.has(qst.q)) qst.q = (complete.length ? complete[complete.length - 1] : qs[qs.length - 1]).key;
+  const sel = document.getElementById("qaQ"); sel.replaceChildren(...qs.slice().reverse().map(q => { const o = document.createElement("option"); o.value = q.key; o.textContent = q.lbl + " (" + q.idx.length + " days)"; return o; })); sel.value = qst.q;
+  const cur = byKey.get(qst.q), prev = byKey.get(qst.q - 1), yago = byKey.get(qst.q - 4);
+  document.getElementById("qaNote").textContent = "Average of DAILY scheme AUM over each quarter (AMFI-CRISIL daily AUM, one fetch per trading day), the same basis as the quarterly average AUM the AMCs report. " +
+    "Daily data covers " + DAILY.d[0] + " to " + DAILY.d[DAILY.d.length - 1] + " (" + DAILY.d.length + " trading days); quarters with fewer than 40 days are partial. Category and arbitrage filters above apply. " +
+    "QoQ and YoY compare the selected quarter with the previous quarter and the same quarter a year earlier, where daily data exists for both.";
+  // table: industry + top 20 AMCs by selected-quarter average
+  const ents = ["__IND__"].concat(A.map((n, i) => i).filter(i => DAILY.s[String(i)]).sort((a, b) => qAvg(b, cur) - qAvg(a, cur)).slice(0, 20));
+  const t = document.createElement("table"); t.className = "fin-tbl"; t.style.width = (220 + (qs.length + 2) * 100) + "px";
+  const th = document.createElement("thead"), tr = document.createElement("tr");
+  ["AMC"].concat(qs.map(q => q.lbl + (q.idx.length < 40 ? " (" + q.idx.length + "d)" : ""))).concat(["QoQ % " + cur.lbl, "YoY % " + cur.lbl]).forEach((h, i) => { const c = document.createElement("th"); c.textContent = h; if (i === qs.indexOf(cur) + 1) c.style.color = cssv("--accent"); tr.appendChild(c); }); th.appendChild(tr); t.appendChild(th);
+  const tb = document.createElement("tbody"), pct = v => v == null ? "·" : (v > 0 ? "+" : "") + v.toFixed(1) + "%";
+  ents.forEach(ai => { const row = document.createElement("tr"); if (ai === "__IND__") row.className = "tot"; const a = document.createElement("td"); a.textContent = ai === "__IND__" ? "Industry" : A[ai]; row.appendChild(a);
+    const c0 = qAvg(ai, cur), cp = prev ? qAvg(ai, prev) : null, cy = yago ? qAvg(ai, yago) : null;
+    qs.forEach(q => { const td = document.createElement("td"); const v = qAvg(ai, q); td.textContent = v ? fmtNum(v) : "·"; if (q === cur) td.style.fontWeight = "700"; row.appendChild(td); });
+    [c0 && cp ? (c0 / cp - 1) * 100 : null, c0 && cy ? (c0 / cy - 1) * 100 : null].forEach(v => { const td = document.createElement("td"); td.textContent = pct(v); td.style.fontWeight = "700"; if (v != null) td.className = v < 0 ? "neg" : "pos"; row.appendChild(td); });
+    tb.appendChild(row); });
+  t.appendChild(tb); document.getElementById("qaTbl").replaceChildren(t);
+  document.getElementById("cap_qaTbl").textContent = "Quarterly average of daily AUM, ₹ Cr · " + (st.cat === "All" ? "equity + hybrid" : st.cat.toLowerCase()) + (st.exArb ? ", excluding arbitrage" : ", including arbitrage") + " · top 20 AMCs by " + cur.lbl + " average";
+  // daily chart for one entity with quarter-average steps
+  const es = document.getElementById("qaEnt"); if (!es.options.length){ es.replaceChildren(...[["__IND__", "Industry"]].concat(A.map((n, i) => [String(i), n]).filter(([v]) => DAILY.s[v])).map(([v, n]) => { const o = document.createElement("option"); o.value = v; o.textContent = n; return o; })); es.onchange = e => { qst.ent = e.target.value; renderQaum(); }; } es.value = qst.ent;
+  const ai = qst.ent === "__IND__" ? "__IND__" : +qst.ent, labels = DAILY.d.map(d => d.slice(2, 4) + "-" + MON[+d.slice(5, 7) - 1] + "-" + d.slice(8));
+  const dv = DAILY.d.map((d, i) => dailyVal(ai, i)), qv = DAILY.d.map((d, i) => qAvg(ai, byKey.get(qOf(d).key)));
+  document.getElementById("cap_qaChart").textContent = (qst.ent === "__IND__" ? "Industry" : A[ai]) + " · daily AUM with each quarter's average as the flat line · ₹ Cr";
+  mk("c_qaChart", { data: { labels, datasets: [line(dv, cssv("--s1"), { label: "Daily AUM", pointRadius: 0, borderWidth: 1.5 }), line(qv, cssv("--s2"), { label: "Quarter average", pointRadius: 0, borderWidth: 2, stepped: true })] }, _fmt: v => v == null ? "—" : fmtNum(v),
+    options: baseOpts({ plugins: { legend: { display: true }, tooltip: { callbacks: { label: c => " " + c.dataset.label + "  ₹" + fmtNum(c.parsed.y) + " Cr" } } }, scales: { x: Object.assign(baseOpts().scales.x, { ticks: { color: cssv("--muted"), font: { size: 11 }, maxRotation: 0, autoSkip: true, maxTicksLimit: 14 } }), y: Object.assign(baseOpts().scales.y, { ticks: { color: cssv("--muted"), font: { size: 11 }, callback: axisCr } }) } }) });
+}
+document.getElementById("qaQ").onchange = e => { qst.q = +e.target.value; renderQaum(); };
+
+// ── Listed AMCs (company financials) ───────────────────────────────────────
+const AMC = /*__AMC__*/null;
+const ast = { freq: "Q", view: "mn", base: "aum_x", period: null, fc: false };
+const BASE_LBL = { aum: "Total AAUM", aum_x: "Total AAUM excl. EPFO-type mandates", aum_mf: "MF AAUM" };
+const CO_SLOT = { IPRU: 0, HDFC: 1, NAM: 2, SBI: 3, CRAMC: 4 };
+const coColor = k => SLOTS()[CO_SLOT[k] ?? 7];
+function pOrd(p){ const m = p.match(/^(\d)QFY(\d\d)$/); if (m) return (2000 + +m[2]) * 4 + +m[1]; const y = p.match(/^FY(\d\d)(E?)$/); return y ? (2000 + +y[1]) * 4 + 4.5 : 0; }
+const isFc = p => /E$/.test(p);
+const Q_FROM = pOrd("1QFY21");                                   // quarterly tables start here (as in the banks dashboard)
+function coRows(c){ const rows = ast.freq === "Q" ? c.quarterly : c.annual.concat(ast.fc && c.key === "IPRU" ? c.forecast : []); return rows.filter(r => r.rev != null || r.aum_mf != null); }
+function prevYearRow(c, p){ const rows = ast.freq === "Q" ? c.quarterly : c.annual.concat(c.forecast); const o = pOrd(p) - 4; return rows.find(r => pOrd(r.p) === o); }
+function enrich(c, r){
+  const ann = ast.freq === "Q" ? 4 : 1, base = r[ast.base], py = prevYearRow(c, r.p);
+  const bps = v => v == null || !base ? null : v * ann / base * 10;
+  const g = k => py && py[k] && r[k] != null ? (r[k] / py[k] - 1) * 100 : null;
+  const e = Object.assign({}, r, {
+    base_aum: base, rev_nonmf: r.mf_fee != null && r.rev != null ? r.rev - r.mf_fee : null,
+    alt_fee: r.aum_alt != null && r.aum_lowm != null ? r.aum_alt - r.aum_lowm : r.aum_alt,
+    r_yield: bps(r.rev), r_mfyield: r.mf_fee != null && r.aum_mf ? r.mf_fee * ann / r.aum_mf * 10 : null,
+    r_nyield: bps(r.rev_net), r_cost: bps(r.opex_x), r_pbtx: bps(r.pbt_x),
+    r_ebitda: r.rev ? r.ebitda / r.rev * 100 : null, r_cir: r.rev_net ? r.opex_x / r.rev_net * 100 : null,
+    r_tax: r.pbt ? r.tax / r.pbt * 100 : null, r_eqshare: r.aum_eq != null && r.aum_mf ? r.aum_eq / r.aum_mf * 100 : null,
+    g_rev: g("rev"), g_ebitda: g("ebitda"), g_pat_x: g("pat_x"), g_base: null, g_aum_mf: g("aum_mf"), _bps: bps });
+  e.g_base = py && py[ast.base] && base != null ? (base / py[ast.base] - 1) * 100 : null;
+  return e;
+}
+// row spec: sec = section header; k = field; ind = indent level; tot = bold subtotal; t = pl | aum | pct | bps
+const AMC_ROWS = () => [
+  { sec: "Profit & loss" + (ast.view === "bps" ? " — bps of " + BASE_LBL[ast.base].toLowerCase() + (ast.freq === "Q" ? ", annualised" : "") : " — ₹ mn") },
+  { k: "rev", l: "Revenue from operations (gross)", t: "pl", tot: true },
+  { k: "mf_fee", l: "MF management fees", t: "pl", ind: 1 },
+  { k: "rev_nonmf", l: "Other operating revenue (PMS / AIF / advisory)", t: "pl", ind: 1 },
+  { k: "comm", l: "Fees & commission paid (distribution on PMS / AIF / advisory)", t: "pl" },
+  { k: "rev_net", l: "Net revenue after fees & commission", t: "pl", tot: true },
+  { k: "emp", l: "Employee cost", t: "pl" },
+  { k: "esop", l: "of which ESOP cost", t: "pl", ind: 1 },
+  { k: "oth_x", l: "Other operating costs (excl. fees & commission)", t: "pl" },
+  { k: "opex_x", l: "Total operating costs (excl. fees & commission)", t: "pl", tot: true },
+  { k: "ebitda", l: "EBITDA", t: "pl", tot: true },
+  { k: "da", l: "Depreciation & amortisation", t: "pl" },
+  { k: "ebit", l: "EBIT", t: "pl" },
+  { k: "fin", l: "Finance cost", t: "pl" },
+  { k: "pbt_x", l: "PBT excl. other income", t: "pl", tot: true },
+  { k: "oi", l: "Other income", t: "pl" },
+  { k: "pbt", l: "PBT incl. other income", t: "pl", tot: true },
+  { k: "tax", l: "Tax", t: "pl" },
+  { k: "pat", l: "PAT incl. other income", t: "pl", tot: true },
+  { k: "pat_x", l: "PAT excl. other income", t: "pl", tot: true },
+  { sec: "Average AUM — ₹ bn" },
+  { k: "base_aum", l: "AAUM base for ratios — " + ({ aum: "Total", aum_x: "Total ex EPFO-type", aum_mf: "MF only" })[ast.base], t: "aum", tot: true },
+  { k: "aum", l: "Total AAUM", t: "aum" },
+  { k: "aum_mf", l: "MF AAUM", t: "aum", ind: 1 },
+  { k: "aum_eq", l: "Equity-oriented", t: "aum", ind: 2 },
+  { k: "aum_debt", l: "Debt", t: "aum", ind: 2 },
+  { k: "aum_liq", l: "Liquid", t: "aum", ind: 2 },
+  { k: "aum_pass", l: "Passive / ETF / other", t: "aum", ind: 2 },
+  { k: "alt_fee", l: "Alternates, fee-earning (PMS / AIF / offshore)", t: "aum", ind: 1 },
+  { k: "aum_lowm", l: "EPFO-type low-margin mandates", t: "aum", ind: 1 },
+  { sec: "Ratios" },
+  { k: "r_yield", l: "Gross revenue yield (bps of AAUM base" + (ast.freq === "Q" ? ", annualised)" : ")"), t: "bps" },
+  { k: "r_nyield", l: "Net revenue yield after fees & commission (bps of AAUM base)", t: "bps" },
+  { k: "r_mfyield", l: "MF fee yield (bps of MF AAUM)", t: "bps" },
+  { k: "r_cost", l: "Operating costs excl. fees & commission (bps of AAUM base)", t: "bps" },
+  { k: "r_pbtx", l: "PBT excl. other income (bps of AAUM base)", t: "bps" },
+  { k: "r_ebitda", l: "EBITDA margin %", t: "pct" },
+  { k: "r_cir", l: "Cost / income % (costs excl. commission over net revenue)", t: "pct" },
+  { k: "r_tax", l: "Effective tax rate %", t: "pct" },
+  { k: "r_eqshare", l: "Equity-oriented share of MF AAUM %", t: "pct" },
+  { k: "g_rev", l: "Revenue YoY %", t: "pct", g: true },
+  { k: "g_ebitda", l: "EBITDA YoY %", t: "pct", g: true },
+  { k: "g_pat_x", l: "PAT excl. other income YoY %", t: "pct", g: true },
+  { k: "g_base", l: "AAUM base YoY %", t: "pct", g: true },
+  { k: "g_aum_mf", l: "MF AAUM YoY %", t: "pct", g: true },
+];
+function finFmt(v, t, e){
+  if (v == null || !isFinite(v)) return "·";
+  if (t === "pl" && ast.view === "bps"){ const b = e._bps(v); return b == null ? "·" : b.toFixed(1); }
+  if (t === "pct" || t === "bps") return (t === "pct" && v > 0 && e && e._g ? "+" : "") + v.toFixed(1);
+  const s = Math.round(Math.abs(v)).toLocaleString("en-IN");
+  return v < 0 ? "(" + s + ")" : s;
+}
+function finTable(head, cols, rows, opts){
+  // head: first-column title; cols: [{lbl, e (enriched row), fc}]; rows: AMC_ROWS()
+  const t = document.createElement("table"); t.className = "fin-tbl";
+  t.style.width = (opts.firstW + cols.length * opts.numW) + "px";
+  const cg = document.createElement("colgroup"); const c0 = document.createElement("col"); c0.style.width = opts.firstW + "px"; cg.appendChild(c0);
+  cols.forEach(() => { const c = document.createElement("col"); c.style.width = opts.numW + "px"; cg.appendChild(c); }); t.appendChild(cg);
+  const th = document.createElement("thead"), tr = document.createElement("tr"); const h0 = document.createElement("th"); h0.textContent = head; tr.appendChild(h0);
+  cols.forEach(c => { const h = document.createElement("th"); h.textContent = c.lbl; if (c.fc) h.className = "fc"; tr.appendChild(h); }); th.appendChild(tr); t.appendChild(th);
+  const tb = document.createElement("tbody");
+  rows.forEach(r => {
+    const row = document.createElement("tr");
+    if (r.sec){ row.className = "sec"; const td = document.createElement("td"); td.colSpan = cols.length + 1; td.textContent = r.sec; row.appendChild(td); tb.appendChild(row); return; }
+    if (cols.every(c => c.e[r.k] == null)) return;                       // drop lines no column carries
+    if (r.tot) row.className = "tot";
+    const a = document.createElement("td"); a.textContent = r.l; if (r.ind) a.className = "ind" + r.ind; row.appendChild(a);
+    cols.forEach(c => { const td = document.createElement("td"); const v = c.e[r.k];
+      td.textContent = finFmt(v, r.t, Object.assign({ _g: r.g }, c.e));
+      const cls = []; if (c.fc) cls.push("fc"); if (v != null && v < 0 && (r.t === "pl" || r.g)) cls.push("neg"); if (r.g && v != null && v > 0) cls.push("pos"); td.className = cls.join(" ");
+      row.appendChild(td); });
+    tb.appendChild(row);
+  });
+  t.appendChild(tb); return t;
+}
+function amcPeriods(){ const s = new Set(); AMC.companies.forEach(c => coRows(c).forEach(r => s.add(r.p))); return [...s].sort((a, b) => pOrd(a) - pOrd(b)); }
+function renderAMC(){
+  if (!AMC){ document.getElementById("amcSeries").textContent = "Company financials not built yet — run build_amc_data.py then build_dashboard.py."; return; }
+  const rows = AMC_ROWS(), periods = amcPeriods();
+  document.getElementById("amcFcWrap").style.display = ast.freq === "A" ? "" : "none";
+  document.getElementById("amcNote").textContent = "Standardised statements for ICICI Pru, HDFC, Nippon and SBI, stacked one after the other, " +
+    (ast.view === "bps" ? "as bps of " + BASE_LBL[ast.base].toLowerCase() + (ast.freq === "Q" ? " (annualised)" : "") : "in ₹ mn") +
+    "; AAUM in ₹ bn. Revenue is gross of the fees & commission paid on PMS / AIF / advisory (disclosed by ICICI Pru and Nippon; HDFC and SBI do not split it out); operating costs are shown excluding that commission, and exclude D&A and finance cost. PBT and PAT are shown both including and excluding other income. " +
+    (ast.freq === "Q" ? "Quarterly runs from 1QFY21 where the models carry it. " : "Annual runs from FY21. ") +
+    "Ratios use the AAUM base selected above; the base line in each AUM block changes with that selection.";
+  // ── stacked time-series blocks ──
+  const wrap = document.getElementById("amcSeries"); wrap.replaceChildren();
+  AMC.companies.forEach(c => {
+    let rs = coRows(c); if (ast.freq === "Q") rs = rs.filter(r => pOrd(r.p) >= Q_FROM);
+    if (!rs.length) return;
+    const block = document.createElement("div"); block.className = "fin-co";
+    const name = document.createElement("div"); name.className = "fin-name"; name.style.color = coColor(c.key); name.textContent = c.name;
+    const tag = document.createElement("span"); tag.className = "fin-tag"; tag.textContent = c.ticker; name.appendChild(tag); block.appendChild(name);
+    const src = document.createElement("div"); src.className = "fin-src"; src.textContent = c.source + ". " + c.notes; block.appendChild(src);
+    const sc = document.createElement("div"); sc.className = "fin-scroll";
+    sc.appendChild(finTable(ast.freq === "Q" ? "Quarter" : "Financial year", rs.map(r => ({ lbl: r.p, e: enrich(c, r), fc: isFc(r.p) })), rows, { firstW: 300, numW: 92 }));
+    block.appendChild(sc); wrap.appendChild(block);
+  });
+  // ── single-period comparison ──
+  const sel = document.getElementById("amcPeriod");
+  if (!ast.period || !periods.includes(ast.period)) ast.period = periods.filter(p => !isFc(p)).pop();
+  sel.replaceChildren(...periods.slice().reverse().map(p => { const o = document.createElement("option"); o.value = p; o.textContent = p; return o; })); sel.value = ast.period;
+  const cos = AMC.companies.map(c => ({ c, r: coRows(c).find(r => r.p === ast.period) })).filter(x => x.r);
+  document.getElementById("cap_amcCmp").textContent = ast.period + " · same lines as the time-series tables, one column per AMC";
+  document.getElementById("amcCmp").replaceChildren(finTable("Line", cos.map(x => ({ lbl: x.c.name, e: enrich(x.c, x.r), fc: isFc(ast.period) })), rows, { firstW: 300, numW: 150 }));
+  // ── charts across companies over time ──
+  const labels = periods, idx = new Map(labels.map((p, i) => [p, i]));
+  const series = fn => AMC.companies.filter(c => coRows(c).length).map(c => { const d = new Array(labels.length).fill(null); coRows(c).forEach(r => { d[idx.get(r.p)] = fn(enrich(c, r), r); }); return line(d, coColor(c.key), { label: c.name, spanGaps: true, pointRadius: 2.5, segment: { borderDash: ctx => isFc(labels[ctx.p1DataIndex]) ? [4, 4] : undefined } }); });
+  const lineOpts = (suffix, dec = 0) => baseOpts({ plugins: { legend: { display: true }, tooltip: { callbacks: { label: c => " " + c.dataset.label + "  " + (c.parsed.y == null ? "—" : c.parsed.y.toFixed(dec) + suffix) } } },
+    scales: { x: baseOpts().scales.x, y: Object.assign(baseOpts().scales.y, { ticks: { color: cssv("--muted"), font: { size: 11 }, callback: v => v + suffix } }) } });
+  const bl = BASE_LBL[ast.base].toLowerCase(), annTxt = ast.freq === "Q" ? ", annualised" : "";
+  document.getElementById("cap_amcYield").textContent = "Revenue from operations, gross of fees & commission paid, as bps of " + bl + annTxt;
+  document.querySelector("#c_amcCost").closest(".card").querySelector(".cap").textContent = "Employee + other operating costs excl. fees & commission, bps of " + bl + annTxt;
+  document.querySelector("#c_amcPbt").closest(".card").querySelector(".cap").textContent = "Core profitability, bps of " + bl + annTxt;
+  mk("c_amcYield", { data: { labels, datasets: series(e => e.r_yield) }, _fmt: v => v == null ? "—" : v.toFixed(1), options: lineOpts("", 1) });
+  mk("c_amcCost", { data: { labels, datasets: series(e => e.r_cost) }, _fmt: v => v == null ? "—" : v.toFixed(1), options: lineOpts("", 1) });
+  mk("c_amcPbt", { data: { labels, datasets: series(e => e.r_pbtx) }, _fmt: v => v == null ? "—" : v.toFixed(1), options: lineOpts("", 1) });
+  document.getElementById("cap_amcGrowth").textContent = BASE_LBL[ast.base] + ", % change vs the same period a year earlier";
+  mk("c_amcGrowth", { data: { labels, datasets: series(e => e.g_base) }, _fmt: v => v == null ? "—" : fmtPct(v), options: lineOpts("%", 1) });
+  const cur = cos.map(x => enrich(x.c, x.r)), names = cos.map(x => x.c.name);
+  document.getElementById("cap_amcSplit").textContent = ast.period + " · ₹ bn";
+  mk("c_amcSplit", { data: { labels: names, datasets: [bar(cur.map(r => r.aum_mf), cssv("--s1"), { label: "Mutual fund" }), bar(cur.map(r => r.alt_fee), cssv("--s2"), { label: "PMS / AIF / offshore (fee-earning)" }), bar(cur.map(r => r.aum_lowm), cssv("--other"), { label: "EPFO-type low-margin mandates" })] }, _fmt: v => v == null ? "—" : Math.round(v).toLocaleString("en-IN"),
+    options: baseOpts({ plugins: { legend: { display: true }, tooltip: { callbacks: { label: c => " " + c.dataset.label + "  ₹" + Math.round(c.parsed.y).toLocaleString("en-IN") + " bn" } } },
+      scales: { x: Object.assign(baseOpts().scales.x, { stacked: true }), y: Object.assign(baseOpts().scales.y, { stacked: true, ticks: { color: cssv("--muted"), font: { size: 11 }, callback: v => v.toLocaleString("en-IN") } }) } }) });
+  document.getElementById("cap_amcMix").textContent = ast.period + " · % of MF AAUM";
+  const mixKeys = [["aum_eq", "Equity-oriented", "--s1"], ["aum_debt", "Debt", "--s2"], ["aum_liq", "Liquid", "--s3"], ["aum_pass", "Passive / ETF / other", "--s4"]];
+  const stackPct = baseOpts({ plugins: { legend: { display: true }, tooltip: { callbacks: { label: c => " " + c.dataset.label + "  " + c.parsed.y.toFixed(1) + "%" } } },
+    scales: { x: Object.assign(baseOpts().scales.x, { stacked: true }), y: Object.assign(baseOpts().scales.y, { stacked: true, max: 100, ticks: { color: cssv("--muted"), font: { size: 11 }, callback: v => v + "%" } }) } });
+  mk("c_amcMix", { data: { labels: names, datasets: mixKeys.map(([k, l, col]) => bar(cur.map(r => { const t = mixKeys.reduce((a, [kk]) => a + (r[kk] || 0), 0); return t && r[k] != null ? r[k] / t * 100 : null; }), cssv(col), { label: l })) }, _fmt: v => v == null ? "—" : v.toFixed(1) + "%", options: stackPct });
+  mk("c_amcEq", { data: { labels, datasets: series(e => e.r_eqshare) }, _fmt: v => v == null ? "\u2014" : v.toFixed(1) + "%", options: lineOpts("%", 1) });
+  // MF vs fee-earning alternates, excluding EPFO-type mandates from the denominator
+  const altShare = r => r.aum_x && r.alt_fee != null ? r.alt_fee / r.aum_x * 100 : null;
+  document.getElementById("cap_amcAltMix").textContent = ast.period + " \u00b7 % of AAUM excluding EPFO-type mandates \u00b7 change the period with the selector above";
+  mk("c_amcAltMix", { data: { labels: names, datasets: [bar(cur.map(r => altShare(r) == null ? null : 100 - altShare(r)), cssv("--s1"), { label: "Mutual fund" }), bar(cur.map(altShare), cssv("--s2"), { label: "PMS / AIF / advisory / offshore" })] }, _fmt: v => v == null ? "\u2014" : v.toFixed(1) + "%", options: stackPct });
+  document.getElementById("cap_amcAltTrend").textContent = "PMS / AIF / advisory / offshore AAUM as % of AAUM excluding EPFO-type mandates";
+  mk("c_amcAltTrend", { data: { labels, datasets: series(e => altShare(e)) }, _fmt: v => v == null ? "\u2014" : v.toFixed(1) + "%", options: lineOpts("%", 1) });
+}
+function segA(id, key){ const el = document.getElementById(id); el.querySelectorAll("button").forEach(b => b.onclick = () => { el.querySelectorAll("button").forEach(x => x.classList.toggle("on", x === b)); ast[key] = b.dataset.v; if (key === "freq") ast.period = null; renderAMC(); }); }
+segA("amcFreq", "freq"); segA("amcView", "view"); segA("amcBase", "base");
+document.getElementById("amcPeriod").onchange = e => { ast.period = e.target.value; renderAMC(); };
+document.getElementById("amcFc").onchange = e => { ast.fc = e.target.checked; renderAMC(); };
+
+// ── Valuation (trailing 12-month P/E from model PAT and Yahoo prices) ─────
+const PX = /*__PX__*/null;
+const vst = { basis: "pat", gs: {} };
+const G_DEFAULT = 14;
+const gFor = key => vst.gs[key] ?? G_DEFAULT;
+const QEND = { 1: 6, 2: 9, 3: 12, 4: 3 };                    // quarter -> calendar month of quarter-end
+function qKey(fy, q){ return q + "QFY" + String(fy % 100).padStart(2, "0"); }
+function qEndYM(fy, q){ const y = q === 4 ? fy : fy - 1; return y + "-" + String(QEND[q]).padStart(2, "0"); }
+// trailing-4-quarter PAT ending at (fy, q): direct sum, else FY bridge (FY(y-1) - its first k quarters + this FY's first k quarters)
+function ttmPat(c, fy, q, k){
+  const Q = new Map(c.quarterly.map(r => [r.p, r[k]])), Aa = new Map(c.annual.map(r => [r.p, r[k]]));
+  const seq = []; let f = fy, qq = q; for (let i = 0; i < 4; i++){ seq.push([f, qq]); qq--; if (qq === 0){ qq = 4; f--; } }
+  if (seq.every(([f2, q2]) => Q.get(qKey(f2, q2)) != null)) return seq.reduce((x, [f2, q2]) => x + Q.get(qKey(f2, q2)), 0);
+  if (q === 4) return Aa.get("FY" + String(fy % 100).padStart(2, "0")) ?? null;
+  const prevFY = Aa.get("FY" + String((fy - 1) % 100).padStart(2, "0")); if (prevFY == null) return null;
+  let x = prevFY; for (let i = 1; i <= q; i++){ const a = Q.get(qKey(fy - 1, i)), b = Q.get(qKey(fy, i)); if (a == null || b == null) return null; x += b - a; }
+  return x;
+}
+function latestQuarterAtOrBefore(c, ym){ let best = null; for (const r of c.quarterly){ if (r.pat == null) continue; const m = r.p.match(/^(\d)QFY(\d\d)$/); const fy = 2000 + +m[2], q = +m[1]; const e = qEndYM(fy, q); if (e <= ym && (!best || e > best.e)) best = { fy, q, e, p: r.p }; } return best; }
+function renderVal(){
+  if (!AMC || !PX){ document.getElementById("vlNote").textContent = "Needs data/amc_financials.json and data/amc_prices.json (run build_amc_data.py and fetch_amc_prices.py, then build_dashboard.py)."; return; }
+  const k = "pat", bl = "reported PAT";
+  document.getElementById("vlNote").textContent = "P/E = market cap ÷ reported PAT (other income is left in, and the cash and investments that earn it are left in the price). Market cap uses the latest diluted share count from each model with split/bonus-adjusted prices (Yahoo Finance), so HDFC AMC's history is comparable across its 1:1 bonus. Trailing 12 months = the four latest reported quarters (for SBI, where two FY26 quarters were never disclosed, the FY26 total bridged with 1QFY26 and 1QFY27). FY27E PAT = FY26 PAT × (1 + the growth % you enter in the table) for HDFC, Nippon and SBI (default " + G_DEFAULT + "%), and the Janchor model's own FY27E forecast for ICICI Pru AMC, whose growth column shows the implied YoY.";
+  const cos = AMC.companies.filter(c => PX.prices[c.key] && c.shares);
+  // snapshot table
+  const rows = cos.map(c => { const px = PX.prices[c.key], lastYM = px.last_date.slice(0, 7), lq = latestQuarterAtOrBefore(c, lastYM);
+    const ttm = lq ? ttmPat(c, lq.fy, lq.q, k) : null, fy26 = (c.annual.find(r => r.p === "FY26") || {})[k];
+    const model27 = c.key === "IPRU" ? ((c.forecast || []).find(r => r.p === "FY27E") || {})[k] : null;
+    const fy27 = model27 != null ? model27 : (fy26 != null ? fy26 * (1 + gFor(c.key) / 100) : null), fromModel = model27 != null;
+    const mcap = px.last * c.shares;                                   // ₹ mn
+    const win = lq ? (() => { const s = []; let f = lq.fy, q = lq.q; for (let i = 0; i < 4; i++){ s.push(qKey(f, q)); q--; if (!q){ q = 4; f--; } } return s[3] + " – " + s[0]; })() : "·";
+    return { c, px, mcap, ttm, win, fy26, fy27, fromModel, g27: fy26 && fy27 != null ? (fy27 / fy26 - 1) * 100 : null, pe: ttm ? mcap / ttm : null, pe26: fy26 ? mcap / fy26 : null, pe27: fy27 ? mcap / fy27 : null }; });
+  document.getElementById("cap_vlTbl").textContent = "Prices as of " + PX.prices[cos[0].key].last_date + " (Yahoo Finance, fetched " + PX.fetched + ") · ₹ · PAT in ₹ mn · " + bl;
+  const t = document.createElement("table"); t.className = "fin-tbl"; t.style.width = "100%";
+  const th = document.createElement("thead"), tr = document.createElement("tr");
+  ["Company", "Ticker", "Price (₹)", "Shares (mn)", "Market cap (₹ Cr)", "TTM window", "TTM PAT", "TTM P/E", "FY26 PAT", "FY26 P/E", "FY27E PAT", "FY27E growth % (editable)", "FY27E P/E"].forEach(h => { const c = document.createElement("th"); c.textContent = h; c.style.whiteSpace = "normal"; tr.appendChild(c); }); th.appendChild(tr); t.appendChild(th);
+  const tb = document.createElement("tbody"), x1 = v => v == null ? "·" : v.toFixed(1) + "x";
+  rows.forEach((r, i) => { const row = document.createElement("tr");
+    [r.c.name, r.px.symbol, r.px.last.toLocaleString("en-IN", { maximumFractionDigits: 0 }), r.c.shares.toFixed(1), fmtNum(r.mcap / 10), r.win, fmtNum(r.ttm), x1(r.pe), fmtNum(r.fy26), x1(r.pe26), fmtNum(r.fy27) + (r.fromModel ? " (model)" : ""), null, x1(r.pe27)].forEach((v, j) => { const c = document.createElement("td");
+      if (j === 11){ if (r.fromModel){ c.textContent = r.g27 == null ? "·" : (r.g27 > 0 ? "+" : "") + r.g27.toFixed(1) + "% (model)"; c.style.fontWeight = "600"; }
+        else { const inp = document.createElement("input"); inp.type = "number"; inp.value = gFor(r.c.key); inp.min = -50; inp.max = 100; inp.step = 0.5; inp.title = "FY27E PAT growth over FY26, %"; inp.style.cssText = "width:64px;font:inherit;text-align:right;padding:3px 6px;border:1px solid var(--accent);border-radius:6px;background:var(--card);color:var(--text)"; inp.onchange = e => { vst.gs[r.c.key] = +e.target.value || 0; renderVal(); }; c.appendChild(inp); c.appendChild(document.createTextNode(" %")); } }
+      else c.textContent = v;
+      if (j === 0){ c.style.fontWeight = "600"; c.style.color = coColor(r.c.key); } if (j === 7 || j === 12) c.style.fontWeight = "700"; row.appendChild(c); }); tb.appendChild(row); });
+  t.appendChild(tb); document.getElementById("vlTbl").replaceChildren(t);
+  // monthly TTM P/E series from Jul 2018
+  const months = []; for (let y = 2018, m = 7; ; ){ const ym = y + "-" + String(m).padStart(2, "0"); months.push(ym); if (ym >= PX.fetched.slice(0, 7)) break; m++; if (m > 12){ m = 1; y++; } }
+  const labels = months.map(ym => MON[+ym.slice(5) - 1] + " '" + ym.slice(2, 4));
+  const series = (fn) => cos.map(c => { const px = PX.prices[c.key]; const d = months.map(ym => { const p = ym === PX.fetched.slice(0, 7) ? px.last : px.monthly[ym]; if (p == null) return null; const lq = latestQuarterAtOrBefore(c, ym); if (!lq) return null; const ttm = ttmPat(c, lq.fy, lq.q, k); return ttm ? fn(p * c.shares, ttm) : null; }); return line(d, coColor(c.key), { label: c.name, spanGaps: false, pointRadius: 0 }); });
+  document.getElementById("cap_vlPe").textContent = "Month-end price × current diluted shares ÷ trailing four quarters of " + bl + " · last point uses the latest price · ICICI Pru and SBI Funds start at listing";
+  mk("c_vlPe", { data: { labels, datasets: series((mc, ttm) => mc / ttm) }, _fmt: v => v == null ? "—" : v.toFixed(1) + "x",
+    options: baseOpts({ plugins: { legend: { display: true }, tooltip: { callbacks: { label: c => " " + c.dataset.label + "  " + (c.parsed.y == null ? "—" : c.parsed.y.toFixed(1) + "x") } } },
+      scales: { x: baseOpts().scales.x, y: Object.assign(baseOpts().scales.y, { ticks: { color: cssv("--muted"), font: { size: 11 }, callback: v => v + "x" } }) } }) });
+}
+
+const rendered = {};
+function renderAll(){
+  const t = st.tab, isB = t === "bridge" || t === "qaum";
+  document.getElementById("filters").hidden = t === "amc" || t === "val"; document.getElementById("kpis").hidden = t === "amc" || isB || t === "perf" || t === "val";
+  ["grpPeriod", "grpAsOf", "grpRange"].forEach(id => { document.getElementById(id).hidden = isB; });
+  if (t === "amc"){ renderAMC(); return; }
+  if (t === "val"){ renderVal(); return; }
+  rebuildBase();
+  if (t === "qaum"){ renderQaum(); return; }
+  if (isB){ renderBridge(); return; }
+  if (t === "perf"){ renderPerf(); return; }
+  renderKpis();
+  document.getElementById("subtitle").textContent = "Equity & hybrid open-ended schemes · " + MM[0].full + " – " + MM[NM-1].full + " · " + A.length + " AMCs · Source: AMFI";
+  if (t === "overview") renderOverview(); else if (t === "cats") renderCats(); else if (t === "amcs") renderAmcs(); else if (t === "dd") renderDD(); else renderData();
+}
+document.getElementById("built").textContent = "Data through " + MM[NM-1].full + " · built " + D.built;
+Chart.defaults.font.family = 'system-ui,-apple-system,"Segoe UI",Roboto,sans-serif';
+fillAsOf(); renderAll();
+</script>
+</body>
+</html>
